@@ -5,6 +5,8 @@
 ## Get latest from `dotnet new gitignore`
 
 # dotenv files
+.venv
+**/__pycache__/
 .env
 backend/.env*.local
 

@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 /*// Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseMySQL(builder.Configuration.GetConnectionString("OracleDb")));*/
-
+builder.Configuration.AddEnvironmentVariables();
 // Configure Cassandra
 var cassandraCluster = Cluster.Builder()
     .AddContactPoint(builder.Configuration.GetValue<string>("Cassandra:Host"))
