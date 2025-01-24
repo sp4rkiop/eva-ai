@@ -1,5 +1,0 @@
-{
-    "appService.defaultWebAppToDeploy": "undefined/subscriptions/6c1b887e-85d7-4bcb-b0ae-921abcac1b3e/resourceGroups/appsvc_linux_centralus_basic/providers/Microsoft.Web/sites/chatiq-dev-ui",
-    "appService.deploySubpath": "frontend",
-    "appService.showBuildDuringDeployPrompt": false
-}

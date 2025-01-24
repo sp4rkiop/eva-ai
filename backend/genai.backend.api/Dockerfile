@@ -1,30 +1,35 @@
-# See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
+# Build stage with multi-platform support
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /repo
 
-# This stage is used when running from VS in fast mode (Default for Debug configuration)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER $APP_UID
+# Copy and restore dependencies
+COPY ["genai.backend.api.csproj", "."]
+RUN dotnet restore "./genai.backend.api.csproj"
+
+# Copy the entire source code
+COPY . .
+
+# Use the target platform to determine the runtime identifier (RID)
+ARG TARGETPLATFORM
+RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    RID=linux-x64 ; \
+    elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    RID=linux-arm64 ; \
+    elif [ "$TARGETPLATFORM" = "linux/arm/v7" ]; then \
+    RID=linux-arm ; \
+    fi \
+    && dotnet publish "./genai.backend.api.csproj" -c Release -o /app/publish -r $RID --self-contained false
+
+# Final runtime stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+
+# Copy published application
+COPY --from=build /app/publish .
+
+# Expose ports
 EXPOSE 8080
 EXPOSE 8081
 
-
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
-WORKDIR /src
-COPY ["genai.backend.api.csproj", "."]
-RUN dotnet restore "./genai.backend.api.csproj"
-COPY . .
-WORKDIR "/src/."
-RUN dotnet build "./genai.backend.api.csproj" -c $BUILD_CONFIGURATION -o /app/build
-
-# This stage is used to publish the service project to be copied to the final stage
-FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./genai.backend.api.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
-
-# This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
-WORKDIR /app
-COPY --from=publish /app/publish .
+# Run the application
 ENTRYPOINT ["dotnet", "genai.backend.api.dll"]
