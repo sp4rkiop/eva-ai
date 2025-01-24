@@ -41,7 +41,7 @@ namespace genai.backend.api.Middlewares
             if (ipAddress != null && user.Identity?.IsAuthenticated == false)
             {
                 var ipRateLimit = _configuration.GetValue<int>("RateLimits:IP");
-                if (await CheckRateLimitAsync(context, $"ip-{ipAddress}", limit:2, 60))
+                if (await CheckRateLimitAsync(context, $"ip-{ipAddress}", limit:5, 60))
                 {
                     return;
                 }

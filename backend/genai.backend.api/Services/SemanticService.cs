@@ -158,8 +158,9 @@ namespace genai.backend.api.Services
                     if (!string.IsNullOrEmpty(chatUpdate.Content))
                     {
                         fullMessage.Append(chatUpdate.Content);
+                        //Console.Write(chatUpdate.Content);
                         await _responseStream.PartialResponse(userId.ToString(), JsonSerializer.Serialize(new { ChatId = chatId.ToString(), PartialContent = chatUpdate.Content }));
-                        await Task.Delay(30);//5ms response stream delay for smooth chat stream
+                        await Task.Delay(20);//20ms response stream delay for smooth chat stream
                     }
                 }
                 await _responseStream.EndStream(userId.ToString());
@@ -246,8 +247,9 @@ namespace genai.backend.api.Services
                     if (!string.IsNullOrEmpty(chatUpdate.Content))
                     {
                         fullMessage.Append(chatUpdate.Content);
+                        //Console.Write(chatUpdate.Content);
                         await _responseStream.PartialResponse(userId.ToString(), JsonSerializer.Serialize(new { ChatId = userId.ToString(), PartialContent = chatUpdate.Content }));
-                        await Task.Delay(30);//5ms response stream delay for smooth chat stream
+                        await Task.Delay(20);//20ms response stream delay for smooth chat stream
                     }
                 }
                 await _responseStream.EndStream(userId.ToString());

@@ -36,7 +36,7 @@
     "langchain": "^0.1.37",
     "lucide-react": "^0.435.0",
     "nanoid": "^5.0.7",
-    "next": "^14.2.11",
+    "next": "^14.2.23",
     "next-auth": "^4.24.7",
     "next-themes": "^0.2.1",
     "react": "^18.3.1",
