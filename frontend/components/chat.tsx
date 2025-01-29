@@ -21,7 +21,7 @@ interface ChatProps {
     uMail: string;
     uImg: string;
     partner: string;
-    userid?: string;
+    userid: string;
     back_auth: string;
     chatService: ChatService;
 }
@@ -41,10 +41,29 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const [isAssistantTyping, setAssistantTyping] = useState<boolean>(false);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const scrollToBottom = () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    const scrollToBottom = useCallback(() => {
+      if (messagesEndRef.current) {
+        const currentScroll = window.scrollY || document.documentElement.scrollTop;
+        const targetScroll = messagesEndRef.current.offsetTop;
+        
+        const animateScroll = (start: number, end: number, duration: number) => {
+          let startTime: number;
+    
+          const step = (currentTime: number) => {
+            if (!startTime) startTime = currentTime;
+            const progress = Math.min((currentTime - startTime) / duration, 1);
+            window.scrollTo(0, start + (end - start) * progress);
+            if (progress < 1) requestAnimationFrame(step);
+          };
+    
+          requestAnimationFrame(step);
+        };
+    
+        animateScroll(currentScroll, targetScroll, 300);
+      }
       setUserInteracted(false);
-  };
+    }, []);
     // const [hastoken, sethastoken] = useState<boolean>(false);
     const getuId_token = async () => {
       const userData = {
@@ -59,13 +78,19 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             "Content-Type": "application/json",
           },
           body: JSON.stringify(userData),
-        }).then((response) => {
+        }).then(async (response) => {
             if (!response.ok) {
-              throw new Error("Failed to send user data to the API");
+              throw new Error("Failed to send user data to the server");
             }
-            update({ back_auth: response.headers.get('authorization') as string });
-            // add back_auth to session user data
-            return response.headers.get('authorization') as string;
+            const userid = await response.text();
+            const back_auth = response.headers.get('authorization');
+            // Update session with new token
+            await update({
+              back_auth: back_auth,
+              userid: userid  // Use the resolved text value
+            });
+        
+            return [back_auth, userid];
           })
     };
     const handleMessageSubmit = async (text: string) => {
@@ -159,39 +184,6 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     };
 
     useEffect(() => {
-    // if(userid==null && status=='authenticated') {
-      
-    //   const userData = {
-    //     emailId: uMail,
-    //     firstName: fName,
-    //     lastName: lName,
-    //     partner: partner,
-    //   };
-    //   // process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-    //   // Send userData to your API endpoint
-    //   fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/UserId`, {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //     },
-    //     body: JSON.stringify(userData),
-    //   })
-    //     .then((response) => {
-    //       if (!response.ok) {
-    //         throw new Error("Failed to send user data to the API");
-    //       }
-    //       update({ back_auth: response.headers.get('authorization') as string });
-    //       // add back_auth to session user data
-    //       return response.text();
-    //     })
-    //     .then(async (data) => {
-    //       update({ userid: data as string });
-    //     })
-    //     .catch((error) => {
-    //       console.error("Error:", error);
-    //     });
-    // }
-    
     // Fetch latest chat history
     if (currentChatId && messages.length === 0) {
       try{
@@ -295,7 +287,8 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
 
   useEffect(() => {
       if (!userInteracted) {
-          messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        scrollToBottom();
+          // messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       }
   }, [messages, userInteracted]);
 

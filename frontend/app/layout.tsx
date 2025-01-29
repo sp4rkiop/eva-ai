@@ -7,7 +7,7 @@ import { Inter } from "next/font/google"
 
 export const metadata = {
   title: "Eva",
-  description: "Made by Abhishek Sinha",
+  description: "Abhishek Sinha @sp4rkiop",
   content:"width=device-width, initial-scale=1.0"
 };
 

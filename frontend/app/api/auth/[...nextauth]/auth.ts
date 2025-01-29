@@ -78,17 +78,15 @@ export const authOptions: NextAuthOptions = {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(userData),
-          
-        })
-          .then((response) => {
+        }).then((response) => {
             if (!response.ok) {
-              throw new Error("Failed to send user data to the API");
+              throw new Error("Failed to send user data to the server");
             }
             back_auth = response.headers.get('authorization') as string;
             return response.text();
           })
           .then((data) => {
-            // console.log("User ID on auth:", data);
+            console.log("User ID on auth:", data);
             userid = data as string;
           })
           .catch((error) => {
@@ -117,10 +115,13 @@ export const authOptions: NextAuthOptions = {
         token.back_auth = (user as any).back_auth;
         token.userid = (user as any).userid;
       }
-      if (trigger === "update" && session?.back_auth) {
+      if (trigger === "update" && session?.back_auth && session?.userid) {
         // Note, that `session` can be any arbitrary object, remember to validate it!
         token.back_auth = session.back_auth;
+        token.userid = session.userid;
       }
+      // console.log(token.userid);
+      // console.log(token.back_auth);
       return token
     },
     async session({ session, token}) {

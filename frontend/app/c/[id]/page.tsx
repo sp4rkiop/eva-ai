@@ -3,34 +3,151 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Chat from "@/components/chat";
 import { ChatService } from '@/lib/service';
-import {useMemo, useEffect } from 'react';
+import {useMemo, useEffect, useState, useRef } from 'react';
 interface IndexPageProps {
-  params: {
-     id: string;
-  };
- }
- 
- export default function IndexPage({params}: IndexPageProps) {
-   const { data: session, status } = useSession();
-   const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
-   const userMail = session?.user?.email ?? '';
-   const userImage = session?.user?.image ?? '';
-   const partner = (session as any)?.partner;
-   const userid = (session as any)?.userid;
-   const back_auth = (session as any)?.back_auth;
-   const router = useRouter();
-   // Create an instance of ChatService
-   const chatService = useMemo(() => ChatService.getInstance(), []);
-   
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      console.log("Redirecting to login page");
-      router.push('/login');
-    }
-    if (status === 'authenticated') {
-      chatService.authToken$.next(back_auth);
-    }
-  }, [status]);
+params: {
+    id: string;
+};
+}
 
-   return <Chat chatId={params.id} fName={fstNam} lName={lstNam} uMail={userMail} uImg={userImage} partner={partner} userid={userid} back_auth={back_auth} chatService={chatService}/>
- }
+// Extend next-auth session type to include custom properties
+declare module "next-auth" {
+  interface Session {
+    partner?: string;
+    userid: string;
+    back_auth: string;
+  }
+}
+
+// JWT Decoding and Validation Utilities
+const decodeJWT = (token: string) => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Invalid JWT token:', error);
+    return null;
+  }
+};
+
+const isTokenExpired = (token: string): boolean => {
+  const decoded = decodeJWT(token);
+  if (!decoded?.exp) return true;
+  
+  const currentTime = Math.floor(Date.now() / 1000);
+  return decoded.exp < currentTime;
+};
+
+export default function IndexPage({params}: IndexPageProps) {
+  const router = useRouter();
+  const { data: session, status, update } = useSession();
+  const [isInitialized, setIsInitialized] = useState(false);
+  const chatService = useMemo(() => ChatService.getInstance(), []);
+  const isRefreshing = useRef(false); // Add ref to track refresh state
+  
+  const getuId_token = async (): Promise<[string, string]> => {
+    try {
+      const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
+      const userData = {
+        emailId: session?.user?.email,
+        firstName: fstNam,
+        lastName: lstNam,
+        partner: session?.partner,
+      };
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/UserId`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(userData),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch new token");
+      
+      const userid = await response.text();
+      const back_auth = response.headers.get('authorization') || '';
+
+      await update({
+        back_auth,
+        userid
+      });
+
+      return [back_auth, userid];
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      router.push('/login?error=session_expired');
+      return ["", ""];
+    }
+  };
+  
+    // Redirect unauthenticated users
+    useEffect(() => {
+      if (status === 'unauthenticated') {
+        router.push('/login');
+      }
+    }, [status, router]);
+  
+    // Initialize chat service when authenticated
+    useEffect(() => {
+      const initializeChatService = async () => {
+        if (!session || status !== 'authenticated' || isRefreshing.current) return;
+        try {
+          isRefreshing.current = true;
+          let currentAuth = session.back_auth;
+          let currentUserId = session.userid;
+
+          // Refresh token if expired
+          if (currentAuth && isTokenExpired(currentAuth)) {
+            [currentAuth, currentUserId] = await getuId_token();
+          }
+
+          if (currentAuth && currentUserId) {
+            chatService.authToken$.next(currentAuth);
+            chatService.userId$.next(currentUserId);
+            setIsInitialized(true);
+          }
+        } finally {
+          isRefreshing.current = false;
+        }
+      };
+  
+      initializeChatService();
+    }, [status, session]);
+
+  // Show loading state while checking auth status
+  if (status === 'loading' || !isInitialized) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  // Safely destructure user data with fallbacks
+  const [firstName, lastName] = session?.user?.name?.split(/\s+/) ?? ['', ''];
+  const userData = {
+    email: session?.user?.email || '',
+    image: session?.user?.image || '',
+    partner: session?.partner || '',
+    userid: session?.userid || '',
+    back_auth: session?.back_auth || ''
+  };
+
+  return (
+    <Chat 
+      chatId={params.id} 
+      fName={firstName} 
+      lName={lastName} 
+      uMail={userData.email} 
+      uImg={userData.image} 
+      partner={userData.partner} 
+      userid={userData.userid} 
+      back_auth={userData.back_auth} 
+      chatService={chatService}/>
+  );
+}

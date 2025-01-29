@@ -60,7 +60,6 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
 
   const handleLogout = async () => {
     window.localStorage.clear();
-    window.localStorage.clear();
     await signOut({ callbackUrl: '/login' }); // Redirects to the login page after logout
   };
 
