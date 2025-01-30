@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!response.ok) {
-            throw new Error("Failed to send user data to the API");
+            throw new Error("status: " + response.status);
           }
 
           back_auth = response.headers.get('authorization') || "";
@@ -80,7 +80,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!response.ok) {
-            throw new Error("Failed to send user data to the API");
+            throw new Error("status: " + response.status);
           }
 
           back_auth = response.headers.get('authorization') || "";
