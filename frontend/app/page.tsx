@@ -106,9 +106,9 @@ export default function HomePage() {
         }
 
         if (currentAuth && currentUserId) {
+          setIsInitialized(true);
           chatService.authToken$.next(currentAuth);
           chatService.userId$.next(currentUserId);
-          setIsInitialized(true);
         }
       } finally {
         isRefreshing.current = false;
@@ -119,7 +119,7 @@ export default function HomePage() {
   }, [status, session]);
 
   // Show loading state while checking auth status
-  if (status === 'loading' || !isInitialized) {
+  if (!isInitialized) {
     return <div className="loading">Loading...</div>;
   }
 
