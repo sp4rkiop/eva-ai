@@ -19,29 +19,27 @@ export const authOptions: NextAuthOptions = {
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-        // Send userData to your API endpoint
-        await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/UserId`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(userData),
-          
-        }).then((response) => {
-            if (!response.ok) {
-              throw new Error("Failed to send user data to the API");
-            }
-            back_auth = response.headers.get('authorization') as string;
-            return response.text();
-          })
-          .then((data) => {
-            // console.log("User ID on auth:", data as string);
-            userid = data as string;
-            
-          })
-          .catch((error) => {
-            console.error("Error:", error);
+        try {
+          // Send userData to your API endpoint
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(userData),
           });
+
+          if (!response.ok) {
+            throw new Error("Failed to send user data to the API");
+          }
+
+          back_auth = response.headers.get('authorization') || "";
+          userid = await response.text();
+        } catch (error) {
+          console.error("Error fetching user ID or auth token:", error);
+          throw error; // Ensure the error propagates and prevents login
+        }
+
         const user = {
           id: profile.sub,
           name: profile.name ?? profile.email,
@@ -71,27 +69,26 @@ export const authOptions: NextAuthOptions = {
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-        // Send userData to your API endpoint
-        await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/UserId`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(userData),
-        }).then((response) => {
-            if (!response.ok) {
-              throw new Error("Failed to send user data to the server");
-            }
-            back_auth = response.headers.get('authorization') as string;
-            return response.text();
-          })
-          .then((data) => {
-            // console.log("User ID on auth:", data);
-            userid = data as string;
-          })
-          .catch((error) => {
-            console.error("Error:", error);
+        try {
+          // Send userData to your API endpoint
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(userData),
           });
+
+          if (!response.ok) {
+            throw new Error("Failed to send user data to the API");
+          }
+
+          back_auth = response.headers.get('authorization') || "";
+          userid = await response.text();
+        } catch (error) {
+          console.error("Error fetching user ID or auth token:", error);
+          throw error; // Ensure the error propagates and prevents login
+        }
 
         const user ={
           id: `${profile.id}`,
@@ -100,7 +97,7 @@ export const authOptions: NextAuthOptions = {
           image: profile.avatar_url,
           back_auth,
           userid
-        }
+        } as User;
         return user;
       },
     }),
