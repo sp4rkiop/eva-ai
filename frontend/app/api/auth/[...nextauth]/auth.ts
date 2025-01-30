@@ -76,7 +76,7 @@ export const authOptions: NextAuthOptions = {
           });
 
           if (!response.ok) {
-            throw new Error(`status: ${response.status}, url: ${response.url}, body: ${JSON.stringify(userData)}`);
+            throw new Error("status: " + response.status);
           }
 
           back_auth = response.headers.get('authorization') || "";

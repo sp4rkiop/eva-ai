@@ -111,9 +111,9 @@ export default function IndexPage({params}: IndexPageProps) {
           }
 
           if (currentAuth && currentUserId) {
+            setIsInitialized(true);
             chatService.authToken$.next(currentAuth);
             chatService.userId$.next(currentUserId);
-            setIsInitialized(true);
           }
         } finally {
           isRefreshing.current = false;
