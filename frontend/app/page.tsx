@@ -93,6 +93,9 @@ export default function HomePage() {
   // Initialize chat service when authenticated
   useEffect(() => {
     const initializeChatService = async () => {
+      console.log('status', status);
+      console.log('session', session);
+      console.log('isRefreshing.current', isRefreshing.current);
       if (!session || status !== 'authenticated' || isRefreshing.current) return;
 
       try {
@@ -104,8 +107,9 @@ export default function HomePage() {
         if (currentAuth && isTokenExpired(currentAuth)) {
           [currentAuth, currentUserId] = await getuId_token();
         }
-
+        console.log('trying to init');
         if (currentAuth && currentUserId) {
+          console.log('Initialized');
           setIsInitialized(true);
           chatService.authToken$.next(currentAuth);
           chatService.userId$.next(currentUserId);
@@ -116,10 +120,11 @@ export default function HomePage() {
     };
 
     initializeChatService();
-  }, [status, session, isInitialized]);
+  }, [status, session]);
 
   // Show loading state while checking auth status
   if (status === 'loading' || !isInitialized) {
+    console.log('Loading...');
     return <div className="loading">Loading...</div>;
   }
 

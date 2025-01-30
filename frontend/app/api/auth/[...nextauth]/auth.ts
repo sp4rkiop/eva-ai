@@ -86,7 +86,7 @@ export const authOptions: NextAuthOptions = {
             return response.text();
           })
           .then((data) => {
-            console.log("User ID on auth:", data);
+            // console.log("User ID on auth:", data);
             userid = data as string;
           })
           .catch((error) => {
