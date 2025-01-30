@@ -64,7 +64,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   };
 
   const handleRename = (chatId: string, newTitle: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/conversation/${chatId}/?title=${newTitle}`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${chatId}/?title=${newTitle}`, {
       method: "PATCH",
       headers: {
         "Authorization": `Bearer ${back_auth}`
@@ -87,7 +87,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       })
   };
   const handleDelete = (chatId: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/conversation/${chatId}`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${chatId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -109,7 +109,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   useEffect(() => {
     const getConversations = async (newToken?: void): Promise<void> => {
       try{
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/conversations`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversations`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

@@ -4,7 +4,7 @@ import { BehaviorSubject, Subject } from 'rxjs';
 export class ChatService {
   private static instance: ChatService;
   private connection: signalR.HubConnection = new signalR.HubConnectionBuilder()
-  .withUrl(process.env.NEXT_PUBLIC_BLACKEND_API_URL + "/hub", {
+  .withUrl(process.env.NEXT_PUBLIC_BACKEND_API_URL + "/hub", {
     accessTokenFactory: () => this.authToken$.value
   })
   .withAutomaticReconnect()

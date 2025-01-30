@@ -72,7 +72,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
         lastName: lName,
         partner: partner,
       };
-        await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/UserId`, {
+        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -111,7 +111,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
 
             setAssistantTyping(true);
             
-            var response = await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Semantic`, {
+            var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -125,7 +125,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             });
             if (response.status == 401 || !response.ok) {
                 const newToken = await getuId_token();
-                response = await fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Semantic`, {
+                response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
                   method: 'POST',
                   headers: {
                       'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     if (currentChatId && messages.length === 0) {
       try{
         setloadingConversaion(true);
-        fetch(`${process.env.NEXT_PUBLIC_BLACKEND_API_URL}/api/Users/conversation/${currentChatId}`, {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${currentChatId}`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${back_auth}`
