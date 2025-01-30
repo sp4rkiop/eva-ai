@@ -116,10 +116,10 @@ export default function HomePage() {
     };
 
     initializeChatService();
-  }, [status, session]);
+  }, [status, session, isInitialized]);
 
   // Show loading state while checking auth status
-  if (!isInitialized) {
+  if (status === 'loading' || !isInitialized) {
     return <div className="loading">Loading...</div>;
   }
 
