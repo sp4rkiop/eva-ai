@@ -23,9 +23,7 @@ export const authOptions: NextAuthOptions = {
           // Send userData to your API endpoint
           const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),
           });
 
@@ -73,14 +71,12 @@ export const authOptions: NextAuthOptions = {
           // Send userData to your API endpoint
           const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),
           });
 
           if (!response.ok) {
-            throw new Error("status: " + response.status);
+            throw new Error(`status: ${response.status}, url: ${response.url}, body: ${JSON.stringify(userData)}`);
           }
 
           back_auth = response.headers.get('authorization') || "";
