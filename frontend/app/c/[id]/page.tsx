@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import Chat from "@/components/chat";
 import { ChatService } from '@/lib/service';
 import {useMemo, useEffect, useState, useRef } from 'react';
+import LoadingSpinner from '@/components/ui/loading-spinner';
 interface IndexPageProps {
 params: {
     id: string;
@@ -125,7 +126,9 @@ export default function IndexPage({params}: IndexPageProps) {
 
   // Show loading state while checking auth status
   if (status === 'loading' || !isInitialized) {
-    return <div className="loading">Loading...</div>;
+    return <div className="fixed inset-0 flex items-center justify-center">
+    <LoadingSpinner show={true} />
+  </div>;
   }
 
   // Safely destructure user data with fallbacks

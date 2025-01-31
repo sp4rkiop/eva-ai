@@ -42,10 +42,15 @@ const Input: React.FC<InputProps> = ({isActive, onSubmit, messagesLength, showSa
     };
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault(); // Prevent form submission
+          // Check if device is mobile/tablet using touch detection
+          const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+          
+          if (!isTouchDevice) {
+            event.preventDefault();
             handleSubmit(event as any);
+          }
         }
-    };
+      };
 
     return (
         <div className="w-full pt-2 md:pt-0 dark:border-white/20 md:border-transparent md:dark:border-transparent md:w-[calc(100%-.5rem)]">
@@ -65,11 +70,7 @@ const Input: React.FC<InputProps> = ({isActive, onSubmit, messagesLength, showSa
                                         onChange={handleChange}
                                         onFocus={() => setIsTyping(true)}
                                         onBlur={() => setIsTyping(text.trim().length > 0)}
-                                        onKeyDown={(event) => {
-                                            if (!(window.navigator.userAgent.match(/(tablet|ipad|iphone|android|playbook|silk)|(android(?!.*mobi))/i))) {
-                                                handleKeyDown(event);
-                                            }
-                                        }}
+                                        onKeyDown={handleKeyDown}
                                         disabled={isActive}
                                     className={`w-full resize-none outline-none bg-transparent dark:bg-transparent py-[10px] md:py-2 pl-3 md:pl-4 placeholder-black/60 dark:placeholder-white/60 text-base ${isActive && 'opacity-50 cursor-wait'}`}
                                     style={{ maxHeight: '240px', overflowY: 'auto' }}

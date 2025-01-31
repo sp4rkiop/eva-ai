@@ -272,18 +272,24 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
   }, [currentChatId]);
 
   useEffect(() => {
-    const handleUserInteraction = () => {
-        setUserInteracted(true);
-    };
+      const handleUserInteraction = () => {
+          setUserInteracted(true);
+      };
 
-    window.addEventListener('scroll', handleUserInteraction);
-    window.addEventListener('click', handleUserInteraction);
+      // Add event listeners for both mouse and touch interactions
+      window.addEventListener('scroll', handleUserInteraction);
+      window.addEventListener('click', handleUserInteraction);
+      window.addEventListener('touchstart', handleUserInteraction, { passive: true });
+      window.addEventListener('touchmove', handleUserInteraction, { passive: true });
 
-    return () => {
-        window.removeEventListener('scroll', handleUserInteraction);
-        window.removeEventListener('click', handleUserInteraction);
-    };
-}, []);
+      return () => {
+          // Clean up all event listeners
+          window.removeEventListener('scroll', handleUserInteraction);
+          window.removeEventListener('click', handleUserInteraction);
+          window.removeEventListener('touchstart', handleUserInteraction);
+          window.removeEventListener('touchmove', handleUserInteraction);
+      };
+  }, []);
 
   useEffect(() => {
       if (!userInteracted) {
@@ -307,7 +313,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                                     (messages.map((message, index) => (
                                             <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
                                               {/* <div className="h-1 bg-gradient-to-r from-black to-black mx-auto gap-3 md:px-5 lg:px-1 xl:px-5 mb-5 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem]"></div> */}
-                                                <div className='flex flex-1 w-full text-base mx-auto gap-3 md:px-5 lg:px-1 xl:px-5 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
+                                                <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
                                                     <div className="flex-shrink-0 flex flex-col relative items-end">
                                                         <div>
                                                             <div className="pt-0.5">

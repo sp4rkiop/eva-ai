@@ -105,7 +105,59 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         setChatTitles(chatTitles.filter((t) => t.id !== chatId));
     }})
   };
+  const groupChatsByDate = (chats: ChatTitle[]): { [key: string]: ChatTitle[] } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Midnight today
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   
+    const groups: { [key: string]: ChatTitle[] } = {};
+  
+    chats.forEach((chat) => {
+      const lastActivity = new Date(chat.lastActivity);
+      
+      if (lastActivity >= today) {
+        if (!groups['Today']) groups['Today'] = [];
+        groups['Today'].push(chat);
+      } else if (lastActivity >= yesterday) {
+        if (!groups['Yesterday']) groups['Yesterday'] = [];
+        groups['Yesterday'].push(chat);
+      } else if (lastActivity >= sevenDaysAgo) {
+        if (!groups['7 Days Ago']) groups['7 Days Ago'] = [];
+        groups['7 Days Ago'].push(chat);
+      } else if (lastActivity >= thirtyDaysAgo) {
+        if (!groups['30 Days Ago']) groups['30 Days Ago'] = [];
+        groups['30 Days Ago'].push(chat);
+      } else {
+        const year = lastActivity.getFullYear().toString();
+        if (!groups[year]) groups[year] = [];
+        groups[year].push(chat);
+      }
+    });
+  
+    return groups;
+  };
+  const groupedChats = groupChatsByDate(chatTitles);
+  const sortedGroups = Object.entries(groupedChats)
+  .sort(([a], [b]) => {
+    const categoryOrder = ['Today', 'Yesterday', '7 Days Ago', '30 Days Ago'];
+    const aIsYear = !isNaN(Number(a));
+    const bIsYear = !isNaN(Number(b));
+    
+    if (categoryOrder.includes(a) && categoryOrder.includes(b)) {
+      return categoryOrder.indexOf(a) - categoryOrder.indexOf(b);
+    }
+    if (categoryOrder.includes(a)) return -1;
+    if (categoryOrder.includes(b)) return 1;
+    if (aIsYear && bIsYear) return parseInt(b) - parseInt(a);
+    return 0;
+  })
+  .map(([name, chats]) => ({ name, chats }));
+
   useEffect(() => {
     const getConversations = async (newToken?: void): Promise<void> => {
       try{
@@ -203,77 +255,84 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
               <div className="h-6 rounded mb-2 skeleton"></div>
             </div>
           ) : chatTitles.length === 0 ? (
-            <div className={`grow gap-2 pt-8 pb-4 text-sm text-center`}>No Chats Found.<div className='pt-2'>Go Ahead with your first question</div></div>
+            <div className={`grow gap-2 pt-8 pb-4 text-sm text-center`}>Hi there.<div className='pt-2'>Go Ahead with your first chat</div></div>
           ) : (
             <div className="grow flex-col gap-2 pt-4 pb-4 text-sm overflow-y-auto">
-              <TransitionGroup>
-                {chatTitles.map((chatTitle) => (
-                  <CSSTransition
-                  key={chatTitle.id}
-                  nodeRef={nodeRef}
-                  timeout={500}
-                  classNames="chat-title"
-                  >
-                    <div key={chatTitle.id} ref={nodeRef} className={`relative pt-1 pb-1 overflow-x-hidden group`}>
-                      <div className={`group flex items-center h-8 rounded-lg px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
-                        <button
-                          className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
-                          onClick={(e) => { e.preventDefault(); onOldChatClick(chatTitle.id); if (window.innerWidth < 768) {toggleChatHistoryVisibility();}}}
-                        >{chatTitle.title}</button>
-                      </div>
-                      {/* Dropdown menu for each chat title */}
-                      <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100 `}>
-                        <Dialog>
-                          <DropdownMenu modal={false}>
-                            <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
-                                <svg className="w-5 h-4 " aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
-                                  <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
-                                </svg>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="rounded-2xl bg-neutral-300 dark:bg-[#212121]">
-                              <DialogTrigger asChild className="block w-full text-left text-sm">
-                                <DropdownMenuItem className="rounded-xl hover:bg-neutral-400 hover:dark:bg-neutral-600">Rename</DropdownMenuItem>
-                              </DialogTrigger>
-                              <DropdownMenuItem onClick={() => {handleDelete(chatTitle.id)}}
-                                      className="rounded-xl hover:bg-neutral-400 hover:dark:bg-neutral-600">
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                          <DialogContent className="max-w-[400px] md:max-w-[425px]">
-                            <DialogHeader className="max-md:text-left">
-                              <DialogTitle>Edit Chat Title</DialogTitle>
-                              <DialogDescription>
-                                Click save when you&apos;re done.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="grid gap-4 py-4 max-md:justify-start">
-                              <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
-                                  Title
-                                </Label>
-                                <Input
-                                  id="name"
-                                  defaultValue={chatTitle.title}
-                                  onChange={(e) => setTitle(e.target.value)} // Update state on input change
-                                  className="col-span-3"
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <DialogClose asChild>
-                                <Button type="button" className="w-fit ml-auto" onClick={() => {handleRename(chatTitle.id, title)}}>
-                                  Save changes
-                                </Button>
-                              </DialogClose>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </div>
-                  </CSSTransition>
-                ))}
-              </TransitionGroup>
+              {sortedGroups.map((group) => (
+                <div key={group.name}>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-2">
+                    {group.name}
+                  </div>
+                  <TransitionGroup>
+                    {group.chats.map((chatTitle) => (
+                      <CSSTransition
+                      key={chatTitle.id}
+                      nodeRef={nodeRef}
+                      timeout={500}
+                      classNames="chat-title"
+                      >
+                        <div ref={nodeRef} className={`relative pt-1 pb-1 overflow-x-hidden group`}>
+                          <div className={`group flex items-center h-8 rounded-lg px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
+                            <button
+                              className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
+                              onClick={(e) => { e.preventDefault(); onOldChatClick(chatTitle.id); if (window.innerWidth < 768) {toggleChatHistoryVisibility();}}}
+                            >{chatTitle.title}</button>
+                          </div>
+                          {/* Dropdown menu for each chat title */}
+                          <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100 `}>
+                            <Dialog>
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
+                                    <svg className="w-5 h-4 " aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
+                                      <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
+                                    </svg>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="rounded-2xl bg-neutral-300 dark:bg-[#212121]">
+                                  <DialogTrigger asChild className="block w-full text-left text-sm">
+                                    <DropdownMenuItem className="rounded-xl hover:bg-neutral-400 hover:dark:bg-neutral-600">Rename</DropdownMenuItem>
+                                  </DialogTrigger>
+                                  <DropdownMenuItem onClick={() => {handleDelete(chatTitle.id)}}
+                                          className="rounded-xl hover:bg-neutral-400 hover:dark:bg-neutral-600">
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              <DialogContent className="max-w-[400px] md:max-w-[425px]">
+                                <DialogHeader className="max-md:text-left">
+                                  <DialogTitle>Edit Chat Title</DialogTitle>
+                                  <DialogDescription>
+                                    Click save when you&apos;re done.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4 max-md:justify-start">
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                      Title
+                                    </Label>
+                                    <Input
+                                      id="name"
+                                      defaultValue={chatTitle.title}
+                                      onChange={(e) => setTitle(e.target.value)} // Update state on input change
+                                      className="col-span-3"
+                                    />
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <DialogClose asChild>
+                                    <Button type="button" className="w-fit ml-auto" onClick={() => {handleRename(chatTitle.id, title)}}>
+                                      Save changes
+                                    </Button>
+                                  </DialogClose>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      </CSSTransition>
+                    ))}
+                  </TransitionGroup>
+                </div>
+              ))}
             </div>
           )}
           <div className="w-full left-0 right-0 chat-history">
