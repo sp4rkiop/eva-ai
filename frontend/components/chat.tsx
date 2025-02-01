@@ -14,6 +14,10 @@ import { CodeBlock, generateRandomString } from './ui/codeblock';
 import { MemoizedReactMarkdown } from './markdown';
 import LoadingSpinner from './ui/loading-spinner';
 import { ButtonScrollToBottom } from './ui/button-scroll-to-bottom';
+import 'katex/dist/katex.min.css';
+import rehypeKatex from 'rehype-katex';
+import { BlockMath } from 'react-katex';
+
 interface ChatProps {
     chatId?: string;
     fName: string;
@@ -338,38 +342,49 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                                                                   message.role === 'assistant' ? (<MemoizedReactMarkdown
                                                                     className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
                                                                     remarkPlugins={[remarkGfm, remarkMath]}
+                                                                    rehypePlugins={[rehypeKatex]}
                                                                     components={{
                                                                       p({ children }) {
                                                                         return <p className="mb-2 last:mb-0">{children}</p>
                                                                       },
-                                                                      code({ node, inline, className, children, ...props }) {
-                                                                        if (children.length) {
-                                                                          if (children[0] == '▍') {
-                                                                            return (
-                                                                              <span className="mt-1 cursor-default animate-pulse">▍</span>
-                                                                            )
-                                                                          }
+                                                                      code({ node, className, children, ...props }) {
+                                                                        // if (children.length) {
+                                                                        //   if (children[0] == '▍') {
+                                                                        //     return (
+                                                                        //       <span className="mt-1 cursor-default animate-pulse">▍</span>
+                                                                        //     )
+                                                                        //   }
                                                           
-                                                                          children[0] = (children[0] as string).replace('`▍`', '▍')
+                                                                        //   children[0] = (children[0] as string).replace('`▍`', '▍')
+                                                                        // }
+                                                                        if (className?.startsWith('math')) {
+                                                                          return <BlockMath math={String(children)} />
+                                                                        }
+                                                                        if (className === 'language-math') {
+                                                                          return <BlockMath math={String(children).replace(/\n$/, '')} />
                                                                         }
                                                           
                                                                         const match = /language-(\w+)/.exec(className || '')
                                                           
-                                                                        if (inline) {
-                                                                          return (
-                                                                            <code className={className} {...props}>
-                                                                              {children}
-                                                                            </code>
-                                                                          )
-                                                                        }
+                                                                        // if (inline) {
+                                                                        //   return (
+                                                                        //     <code className={className} {...props}>
+                                                                        //       {children}
+                                                                        //     </code>
+                                                                        //   )
+                                                                        // }
                                                           
-                                                                        return (
+                                                                        return match ? (
                                                                           <CodeBlock
                                                                             key={Math.random()}
                                                                             language={(match && match[1]) || ''}
                                                                             value={String(children).replace(/\n$/, '')}
                                                                             {...props}
                                                                           />
+                                                                        ) : (
+                                                                          <code className={className} {...props}>
+                                                                            {children}
+                                                                          </code>
                                                                         )
                                                                       }
                                                                     }}

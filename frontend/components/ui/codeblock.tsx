@@ -5,7 +5,7 @@
 
 import { FC, memo } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { coldarkDark, funky } from 'react-syntax-highlighter/dist/cjs/styles/prism'
+import { coldarkDark, funky, vs, vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 
 import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard'
 import { IconCheck, IconCopy, IconDownload } from '@/components/ui/icons'
@@ -121,6 +121,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
         language={language}
         style={funky}
         PreTag="div"
+        wrapLongLines
         customStyle={{
           margin: 0,
           width: '100%',

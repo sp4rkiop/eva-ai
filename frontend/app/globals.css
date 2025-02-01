@@ -151,6 +151,25 @@
   transform: translateY(-20px);
   transition: opacity 500ms, transform 500ms;
 }
+.katex {
+  font-size: 1.1em !important;
+  padding: 0 0.2em;
+}
+
+.katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Dark mode support */
+.dark .katex {
+  color: #e5e7eb;
+}
+
+.dark .katex .mfrac {
+  color: #e5e7eb;
+}
 @media (prefers-color-scheme: dark) {
   body {
     color: white;
