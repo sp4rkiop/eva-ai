@@ -1,15 +1,15 @@
 "use client"
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Chat from "@/components/chat";
 import { ChatService } from '@/lib/service';
 import {useMemo, useEffect, useState, useRef } from 'react';
 import LoadingSpinner from '@/components/ui/loading-spinner';
-interface IndexPageProps {
-params: {
-    id: string;
-};
-}
+// interface IndexPageProps {
+// params: {
+//     id: string;
+// };
+// }
 
 // Extend next-auth session type to include custom properties
 declare module "next-auth" {
@@ -46,8 +46,10 @@ const isTokenExpired = (token: string): boolean => {
   return decoded.exp < currentTime;
 };
 
-export default function IndexPage({params}: IndexPageProps) {
+export default function IndexPage() {
   const router = useRouter();
+  const params = useParams();
+  const chatId = params.id as string;
   const { data: session, status, update } = useSession();
   const [isInitialized, setIsInitialized] = useState(false);
   const chatService = useMemo(() => ChatService.getInstance(), []);
@@ -122,7 +124,7 @@ export default function IndexPage({params}: IndexPageProps) {
       };
   
       initializeChatService();
-    }, [status, session]);
+    }, [status, session, chatId]);
 
   // Show loading state while checking auth status
   if (status === 'loading' || !isInitialized) {
@@ -143,7 +145,7 @@ export default function IndexPage({params}: IndexPageProps) {
 
   return (
     <Chat 
-      chatId={params.id} 
+      chatId={chatId} 
       fName={firstName} 
       lName={lastName} 
       uMail={userData.email} 

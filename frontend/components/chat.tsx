@@ -45,30 +45,23 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const [isAssistantTyping, setAssistantTyping] = useState<boolean>(false);
     const [userInteracted, setUserInteracted] = useState<boolean>(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [isAtBottom, setIsAtBottom] = useState(true);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const userInteractedRef = useRef(userInteracted);
+    const isAtBottomRef = useRef(isAtBottom);
 
-    const scrollToBottom = useCallback(() => {
-      if (messagesEndRef.current) {
-        const currentScroll = window.scrollY || document.documentElement.scrollTop;
-        const targetScroll = messagesEndRef.current.offsetTop;
-        
-        const animateScroll = (start: number, end: number, duration: number) => {
-          let startTime: number;
-    
-          const step = (currentTime: number) => {
-            if (!startTime) startTime = currentTime;
-            const progress = Math.min((currentTime - startTime) / duration, 1);
-            window.scrollTo(0, start + (end - start) * progress);
-            if (progress < 1) requestAnimationFrame(step);
-          };
-    
-          requestAnimationFrame(step);
-        };
-    
-        animateScroll(currentScroll, targetScroll, 300);
+    const scrollToBottom = useCallback((instant = false, isUser = false) => {
+      if (isUser) {
+        setUserInteracted(false);
       }
-      setUserInteracted(false);
+
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTo({
+          top: chatContainerRef.current.scrollHeight,
+          behavior: instant ? 'auto' : 'smooth'
+        });
+      }
     }, []);
-    // const [hastoken, sethastoken] = useState<boolean>(false);
     const getuId_token = async () => {
       const userData = {
         emailId: uMail,
@@ -174,6 +167,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     );
     const handleNewChat = () => {
       setMessages([]);
+      setIsAtBottom(true);
       window.history.pushState({}, '', `/`);
       setCurrentChatId(undefined);
       setAssistantTyping(false);
@@ -181,6 +175,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const handleOldChat = async (iD?: string) => {
       if(currentChatId !== iD) {
         setMessages([]);
+        setIsAtBottom(true);
         window.history.pushState({}, '', `/c/${iD}`);
         setCurrentChatId(iD);
         setAssistantTyping(false);
@@ -213,6 +208,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                   text: chat.Items[0].Text,
                 }));
               setMessages(newMessages);
+              setTimeout(() => scrollToBottom(true), 50);
             }
             setloadingConversaion(false);
           });
@@ -276,137 +272,204 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
   }, [currentChatId]);
 
   useEffect(() => {
-      const handleUserInteraction = () => {
-          setUserInteracted(true);
-      };
-
-      // Add event listeners for both mouse and touch interactions
-      window.addEventListener('scroll', handleUserInteraction);
-      window.addEventListener('click', handleUserInteraction);
-      window.addEventListener('touchstart', handleUserInteraction, { passive: true });
-      window.addEventListener('touchmove', handleUserInteraction, { passive: true });
-
-      return () => {
-          // Clean up all event listeners
-          window.removeEventListener('scroll', handleUserInteraction);
-          window.removeEventListener('click', handleUserInteraction);
-          window.removeEventListener('touchstart', handleUserInteraction);
-          window.removeEventListener('touchmove', handleUserInteraction);
-      };
-  }, []);
+    userInteractedRef.current = userInteracted;
+  }, [userInteracted]);
 
   useEffect(() => {
-      if (!userInteracted) {
-        scrollToBottom();
-          // messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-      }
+      isAtBottomRef.current = isAtBottom;
+  }, [isAtBottom]);
+
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    let scrollCause: 'user' | 'system' | null = null;
+    let lastUserInteractionTime = 0;
+    const SCROLL_ORIGIN_THRESHOLD = 100; // ms
+
+    // Detect potential user scroll initiations
+    const handlePotentialUserScroll = () => {
+        scrollCause = 'user';
+        lastUserInteractionTime = Date.now();
+    };
+
+    // Unified hardware input listeners
+    const hardwareEvents = ['pointerdown', 'wheel', 'keydown'];
+    hardwareEvents.forEach(event => {
+        container.addEventListener(event, handlePotentialUserScroll, {
+            passive: true,
+            capture: true
+        });
+    });
+
+    // Main scroll handler
+    const handleScroll = () => {
+        // Update bottom detection
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const atBottom = scrollHeight - (scrollTop + clientHeight) < 50;
+        
+        // Only update isAtBottom if value changed
+        if (atBottom !== isAtBottomRef.current) {
+          setIsAtBottom(atBottom);
+          if (atBottom) setUserInteracted(false);
+        }
+
+        const isRecentUserScroll = Date.now() - lastUserInteractionTime < SCROLL_ORIGIN_THRESHOLD;
+        
+        if (scrollCause === 'user' && isRecentUserScroll && !userInteractedRef.current) {
+            setUserInteracted(true);
+        }
+
+        // Reset scroll origin detection
+        scrollCause = null;
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+        hardwareEvents.forEach(event => {
+            container.removeEventListener(event, handlePotentialUserScroll);
+        });
+        container.removeEventListener('scroll', handleScroll);
+    };
+}, []);
+
+useEffect(() => {
+  if (!userInteracted) {
+    requestAnimationFrame(() => scrollToBottom(false));
+  }
   }, [messages, userInteracted]);
 
     return (
         <VisibilityProvider>
-            <div className="relative z-0 flex h-screen w-full overflow-hidden">
+            <div className="relative z-0 flex h-dvh w-full overflow-hidden">
                 <ChatHistory firstName={fName} lastName={lName} userImage={uImg} uMail={uMail} partner={partner} chatId={currentChatId} chatService={chatService} getuId_token={getuId_token} back_auth={back_auth} onNewChatClick={() => handleNewChat()} onOldChatClick={(iD? : string) => handleOldChat(iD)}/>
                 <div className="relative flex-1 flex-col overflow-hidden">
-                    <div className='h-screen w-full flex-1 overflow-auto'>
+                    <div className='flex-1 overflow-auto'>
                         <Sidebar/>
-                        <div className="flex h-screen flex-col">
+                        <div className="flex h-dvh flex-col">
                             <HeaderMobile service={chatService} onNewChatClick={() => handleNewChat()} getuId_token={getuId_token} back_auth={back_auth} /><HeaderDesktop service={chatService} getuId_token={getuId_token} back_auth={back_auth} />
-                            <div className='flex flex-col-reverse h-full overflow-y-auto'>
-                                <div className="translateZ(0px)">
-                                {loadingConversaion ? <LoadingSpinner show={true} /> : (messages.length === 0) ? <Greet /> : 
-                                    (messages.map((message, index) => (
-                                            <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
-                                              {/* <div className="h-1 bg-gradient-to-r from-black to-black mx-auto gap-3 md:px-5 lg:px-1 xl:px-5 mb-5 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem]"></div> */}
-                                                <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
-                                                    <div className="flex-shrink-0 flex flex-col relative items-end">
-                                                        <div>
-                                                            <div className="pt-0.5">
-                                                                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
-                                                                    <div className="relative flex">
-                                                                    {message.role === 'user' ? 
-                                                                    (<img alt="User" loading="lazy" width="24" height="24" decoding="async" data-nimg="1" className="rounded-sm" style={{color: 'transparent'}} src={uImg}/>) 
-                                                                    : (<img className="mx-auto h-6 w-6 " src="/icon.svg" alt="Eva" />)}
-                                                                    </div>
-                                                                </div>
+                            <div className='flex h-full overflow-y-auto'>
+                              <div 
+                                ref={chatContainerRef}
+                                className="relative flex-1 overflow-y-auto" 
+                                style={{ scrollBehavior: 'smooth' }}
+                              >
+                                <div className="flex flex-col-reverse">
+                                  <div className="translateZ(0px)">
+                                  {(messages.length > 0) &&
+                                      (messages.map((message, index) => (
+                                              <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
+                                                {/* <div className="h-1 bg-gradient-to-r from-black to-black mx-auto gap-3 md:px-5 lg:px-1 xl:px-5 mb-5 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem]"></div> */}
+                                                  <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
+                                                      <div className="flex-shrink-0 flex flex-col relative items-end">
+                                                          <div>
+                                                              <div className="pt-0.5">
+                                                                  <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
+                                                                      <div className="relative flex">
+                                                                      {message.role === 'user' ? 
+                                                                      (<img alt="User" loading="lazy" width="24" height="24" decoding="async" data-nimg="1" className="rounded-sm" style={{color: 'transparent'}} src={uImg}/>) 
+                                                                      : (<img className="mx-auto h-6 w-6 " src="/icon.svg" alt="Eva" />)}
+                                                                      </div>
+                                                                  </div>
+                                                              </div>
+                                                          </div>
+                                                      </div>
+                                                      <div className='relative overflow-hidden flex w-full flex-col'>
+                                                          <div className="font-bold select-none capitalize">
+                                                            {message.role==='user'? (fName):('Eva')}</div>
+                                                            <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
+                                                              <div className={`min-h-[20px] flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-xl px-5 py-1.5 w-fit' : ''}`}>
+                                                                {message.isPlaceholder ? (
+                                                                    <SkeletonLoader />
+                                                                ) : (
+                                                                    message.role === 'assistant' ? (<MemoizedReactMarkdown
+                                                                      className="pl-4 prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
+                                                                      remarkPlugins={[remarkGfm, remarkMath]}
+                                                                      rehypePlugins={[rehypeKatex]}
+                                                                      components={{
+                                                                        p({ children }) {
+                                                                          return <p className="mb-2 last:mb-0">{children}</p>
+                                                                        },
+                                                                        code({ node, className, children, ...props }) {
+                                                                          // if (children.length) {
+                                                                          //   if (children[0] == '▍') {
+                                                                          //     return (
+                                                                          //       <span className="mt-1 cursor-default animate-pulse">▍</span>
+                                                                          //     )
+                                                                          //   }
+                                                            
+                                                                          //   children[0] = (children[0] as string).replace('`▍`', '▍')
+                                                                          // }
+                                                                          if (className?.startsWith('math')) {
+                                                                            return <BlockMath math={String(children)} />
+                                                                          }
+                                                                          if (className === 'language-math') {
+                                                                            return <BlockMath math={String(children).replace(/\n$/, '')} />
+                                                                          }
+                                                            
+                                                                          const match = /language-(\w+)/.exec(className || '')
+                                                            
+                                                                          // if (inline) {
+                                                                          //   return (
+                                                                          //     <code className={className} {...props}>
+                                                                          //       {children}
+                                                                          //     </code>
+                                                                          //   )
+                                                                          // }
+                                                            
+                                                                          return match ? (
+                                                                            <CodeBlock
+                                                                              key={Math.random()}
+                                                                              language={(match && match[1]) || ''}
+                                                                              value={String(children).replace(/\n$/, '')}
+                                                                              {...props}
+                                                                            />
+                                                                          ) : (
+                                                                            <code className={className} {...props}>
+                                                                              {children}
+                                                                            </code>
+                                                                          )
+                                                                        }
+                                                                      }}
+                                                                    >
+                                                                      {message.text}
+                                                                    </MemoizedReactMarkdown>
+                                                                    ) : (
+                                                                      <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
+                                                                    )
+                                                                )}
+                                                              </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className='relative overflow-hidden flex w-full flex-col'>
-                                                        <div className="font-bold select-none capitalize">
-                                                          {message.role==='user'? (fName):('Eva')}</div>
-                                                          <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
-                                                            <div className={`min-h-[20px] flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-xl px-5 py-1.5 w-fit' : ''}`}>
-                                                              {message.isPlaceholder ? (
-                                                                  <SkeletonLoader />
-                                                              ) : (
-                                                                  message.role === 'assistant' ? (<MemoizedReactMarkdown
-                                                                    className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
-                                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                                    rehypePlugins={[rehypeKatex]}
-                                                                    components={{
-                                                                      p({ children }) {
-                                                                        return <p className="mb-2 last:mb-0">{children}</p>
-                                                                      },
-                                                                      code({ node, className, children, ...props }) {
-                                                                        // if (children.length) {
-                                                                        //   if (children[0] == '▍') {
-                                                                        //     return (
-                                                                        //       <span className="mt-1 cursor-default animate-pulse">▍</span>
-                                                                        //     )
-                                                                        //   }
-                                                          
-                                                                        //   children[0] = (children[0] as string).replace('`▍`', '▍')
-                                                                        // }
-                                                                        if (className?.startsWith('math')) {
-                                                                          return <BlockMath math={String(children)} />
-                                                                        }
-                                                                        if (className === 'language-math') {
-                                                                          return <BlockMath math={String(children).replace(/\n$/, '')} />
-                                                                        }
-                                                          
-                                                                        const match = /language-(\w+)/.exec(className || '')
-                                                          
-                                                                        // if (inline) {
-                                                                        //   return (
-                                                                        //     <code className={className} {...props}>
-                                                                        //       {children}
-                                                                        //     </code>
-                                                                        //   )
-                                                                        // }
-                                                          
-                                                                        return match ? (
-                                                                          <CodeBlock
-                                                                            key={Math.random()}
-                                                                            language={(match && match[1]) || ''}
-                                                                            value={String(children).replace(/\n$/, '')}
-                                                                            {...props}
-                                                                          />
-                                                                        ) : (
-                                                                          <code className={className} {...props}>
-                                                                            {children}
-                                                                          </code>
-                                                                        )
-                                                                      }
-                                                                    }}
-                                                                  >
-                                                                    {message.text}
-                                                                  </MemoizedReactMarkdown>
-                                                                  ) : (
-                                                                    <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
-                                                                  )
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                              
-                                        ))
-                                    )}
-                                    <div ref={messagesEndRef} />
+                                                </div>
+                                                
+                                          ))
+                                      )}
+                                      <div ref={messagesEndRef} />
+                                  </div>
                                 </div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  {loadingConversaion ? (
+                                    <div className="py-16">
+                                      <LoadingSpinner show={true} />
+                                    </div>
+                                  ) : messages.length === 0 ? (
+                                    <div className="py-16">
+                                      <Greet />
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="sticky bottom-4 right-4 z-10 flex justify-center">
+                                  <ButtonScrollToBottom 
+                                    isAtBottom={isAtBottom}
+                                    scrollToBottom={() => scrollToBottom(false, true)}
+                                    // className="mr-4"
+                                  />
+                                </div>
+                              </div>
                             </div>
-                            {/* <ButtonScrollToBottom isAtBottom={userInteracted} scrollToBottom={scrollToBottom} /> */}
                             <Input isActive={isAssistantTyping} onSubmit={handleMessageSubmit} messagesLength={messages.length} showSampleInput={loadingConversaion}/>
                         </div>
                     </div>

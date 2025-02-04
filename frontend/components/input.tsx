@@ -43,20 +43,24 @@ const Input: React.FC<InputProps> = ({isActive, onSubmit, messagesLength, showSa
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === 'Enter' && !event.shiftKey) {
           // Check if device is mobile/tablet using touch detection
-          const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        //   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        //   console.log(isTouchDevice);
+          const isMobileDevice = () => {
+            return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            };
           
-          if (!isTouchDevice) {
+          if (!isMobileDevice()) {
             event.preventDefault();
             handleSubmit(event as any);
           }
         }
-      };
+    };
 
     return (
         <div className="w-full pt-2 md:pt-0 dark:border-white/20 md:border-transparent md:dark:border-transparent md:w-[calc(100%-.5rem)]">
             <form onSubmit={handleSubmit} className='stretch mx-2 flex flex-row gap-3 last:mb-2 md:mx-4 md:last:mb-6 lg:mx-auto lg:max-w-2xl xl:max-w-3xl'>
                 <div className="relative flex h-full flex-1 items-stretch md:flex-col">
-                    {messagesLength === 0 && !showSampleInput && <SampleInput />}
+                    {messagesLength === 0 && !showSampleInput && <SampleInput  onClick={onSubmit}/>}
                     <div className="flex w-full items-center">
                         <div className={`flex w-full justify-between items-stretch dark:text-white rounded-[26px] bg-[#f4f4f4] dark:bg-[--main-surface-secondary]`}>
                             <div className="flex grow items-center">

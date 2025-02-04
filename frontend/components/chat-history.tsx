@@ -75,7 +75,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         return handleRename(chatId, newTitle);
       }else if (res.status === 204) {
         toast({
-          description: "Chat title updated successfully",
+          description: "Chat title updated",
         })
         chatTitles.map((t) => {
           if (t.id === chatId) {
@@ -103,6 +103,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           description: "Chat removed",
         })
         setChatTitles(chatTitles.filter((t) => t.id !== chatId));
+        onNewChatClick();
     }})
   };
   const groupChatsByDate = (chats: ChatTitle[]): { [key: string]: ChatTitle[] } => {

@@ -10,7 +10,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ show }) => {
     }
 
     return (
-        <div className="flex flex-col items-center mb-[calc(100vh-60vh)]">
+        <div className="flex flex-col items-center">
             <div className="relative">
                 <div className="h-12 w-12">
                     <svg className="h-full w-full bg[--text-quaternary]" fill="none" viewBox="0 0 24 24">

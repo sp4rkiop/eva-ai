@@ -4,7 +4,7 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 import { Button, type ButtonProps } from '@/components/ui/button'
-import { IconArrowDown } from '@/components/ui/icons'
+import { IconArrowDown, IconArrowElbow, IconShare, IconSpinner, IconTrash } from '@/components/ui/icons'
 
 interface ButtonScrollToBottomProps extends ButtonProps {
   isAtBottom: boolean
@@ -23,8 +23,8 @@ export function ButtonScrollToBottom({
       variant="outline"
       size="icon"
       className={cn(
-        ' transition-opacity duration-300 sm:right-8 md:top-2',
-        isAtBottom ? 'opacity-0' : 'opacity-100',
+        'transition-opacity duration-300 shadow-lg hover:scale-105',
+        isAtBottom ? 'opacity-0 cursor-default' : 'opacity-100',
         className
       )}
       onClick={() => scrollToBottom()}

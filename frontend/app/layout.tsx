@@ -23,7 +23,7 @@ export default async function RootLayout({children,
     <html lang="en">
       <body className={inter.className}>
         <Provider session={session}>
-          <main className="h-[calc(100dvh)]">{children}</main>
+          <main className="h-dvh">{children}</main>
           <Toaster />
           </Provider>
       </body>
