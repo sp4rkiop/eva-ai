@@ -379,7 +379,7 @@ useEffect(() => {
                                                           <div className="font-bold select-none capitalize">
                                                             {message.role==='user'? (fName):('Eva')}</div>
                                                             <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
-                                                              <div className={`min-h-[20px] flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-xl px-5 py-1.5 w-fit' : ''}`}>
+                                                              <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-xl px-5 py-1.5 w-fit' : ''}`}>
                                                                 {message.isPlaceholder ? (
                                                                     <SkeletonLoader />
                                                                 ) : (
@@ -461,7 +461,7 @@ useEffect(() => {
                                     </div>
                                   ) : null}
                                 </div>
-                                <div className="sticky bottom-4 right-4 z-10 flex justify-center">
+                                <div className="sticky bottom-4 right-4 z-20 flex justify-center">
                                   <ButtonScrollToBottom 
                                     isAtBottom={isAtBottom}
                                     scrollToBottom={() => scrollToBottom(false, true)}
