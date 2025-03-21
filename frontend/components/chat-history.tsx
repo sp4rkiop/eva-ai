@@ -346,7 +346,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           ) : chatTitles.length === 0 ? (
             <div className={`grow gap-2 pt-8 pb-4 text-sm text-center`}>Hi there.<div className='pt-2'>Go Ahead with your first chat</div></div>
           ) : searchText.trim() !== "" && filteredTitles.length === 0 ? (
-            <div className={`grow gap-2 pt-8 pb-4 text-sm text-center`}>No match found for "<span className="italic">{searchText}</span>"</div>
+            <div className={`grow gap-2 pt-8 pb-4 text-sm text-center`}>No match found for &quot;<span className="italic">{searchText}</span>&quot;</div>
           ) : (
             <div className="grow flex-col gap-2 pt-4 pb-4 text-sm overflow-y-auto">
               {sortedGroups.map((group) => (
