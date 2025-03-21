@@ -134,7 +134,7 @@
   width: 260px;
 }
 .chat-title-enter {
-  opacity: 0.01;
+  opacity: 0;
   transform: translateY(-20px);
 }
 .chat-title-enter-active {
@@ -147,7 +147,7 @@
   transform: translateY(0);
 }
 .chat-title-exit-active {
-  opacity: 0.01;
+  opacity: 0;
   transform: translateY(-20px);
   transition: opacity 500ms, transform 500ms;
 }

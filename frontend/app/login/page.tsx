@@ -11,15 +11,15 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-500 to-indigo-700 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-400 via-white to-zinc-400 dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-900 flex items-center justify-center p-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-4xl bg-white/90 dark:bg-gray-800/90 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden grid md:grid-cols-2"
+        className="w-full max-w-4xl bg-white/90 dark:bg-zinc-800 backdrop-blur-lg rounded-2xl shadow-xl overflow-hidden grid md:grid-cols-2"
       >
         {/* Left Section - Branding & Features */}
-        <div className="hidden md:flex flex-col justify-center p-12 bg-gradient-to-br from-purple-500 to-blue-500 text-white dark:from-gray-900 dark:to-gray-800">
+        <div className="hidden md:flex flex-col justify-center p-12 bg-gradient-to-br from-blue-950 to-blue-500 text-white dark:from-zinc-900 dark:to-zinc-800">
           <div className="mb-8">
             <div className="flex items-center mb-6">
               <IconEva className="h-16 w-16 text-white/90" />
@@ -62,8 +62,8 @@ export default function Login() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold">Cross-Platform</h3>
-                <p className="text-sm opacity-90">Seamless sync across devices</p>
+                <h3 className="font-semibold">Unlimited Chat</h3>
+                <p className="text-sm opacity-90">Unlimited conversation in a single chat</p>
               </div>
             </div>
           </div>
@@ -86,7 +86,7 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => signIn("google")}
-              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-6 py-4 rounded-xl transition-all duration-200"
+              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
             >
               <IconGoogle className="w-6 h-6" />
               <span>Continue with Google</span>
@@ -96,7 +96,7 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => signIn("github")}
-              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-6 py-4 rounded-xl transition-all duration-200"
+              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
             >
               <IconGitHub className="w-6 h-6" />
               <span>Continue with GitHub</span>

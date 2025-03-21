@@ -10,7 +10,7 @@ const SampleButton: React.FC<ButtonProps> = ({ title, description, onClick }) =>
   return (
     <span style={{ opacity: 1, transform: 'none' }}>
       <button
-        className="btn relative btn-neutral group w-full whitespace-nowrap rounded-xl px-4 py-3 text-left text-token-text-primary md:whitespace-normal"
+        className="btn relative btn-neutral group w-full whitespace-nowrap rounded-md px-4 py-3 text-left text-token-text-primary md:whitespace-normal"
         onClick={() => onClick(title +" "+ description)}
       >
         <div className="flex w-full gap-2 items-center justify-center">
@@ -19,9 +19,9 @@ const SampleButton: React.FC<ButtonProps> = ({ title, description, onClick }) =>
               <div className="truncate">{title}</div>
               <div className="truncate font-normal opacity-50">{description}</div>
             </div>
-            <div className="absolute bottom-0 right-0 top-0 flex items-center rounded-xl bg-gradient-to-l from-token-main-surface-secondary pl-6 pr-4 text-token-text-secondary opacity-0 group-hover:opacity-100">
+            <div className="absolute bottom-0 right-0 top-0 flex items-center rounded-md bg-gradient-to-l from-token-main-surface-secondary pl-6 pr-4 text-token-text-secondary opacity-0 group-hover:opacity-100">
               <span className="" data-state="closed">
-                <div className="rounded-lg bg-token-main-surface-primary p-1 shadow-xxs dark:shadow-none">
+                <div className="rounded-md bg-token-main-surface-primary p-1 shadow-xxs dark:shadow-none">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="icon-sm text-token-text-primary">
                     <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
                   </svg>

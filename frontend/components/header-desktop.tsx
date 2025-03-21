@@ -2,7 +2,14 @@ import React, {useEffect, useRef, useState} from 'react';
 import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import { ChatService } from '@/lib/service';
-
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 interface Model {
   id: number;
   name: string;
@@ -91,52 +98,32 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
         <div className="hidden md:block left-0 right-0 py-2">
             <div className="sticky top-0 mb-1.5 flex items-center justify-between z-10 h-14 p-2 font-semibold bg-token-main-surface-primary">
                 <div className="absolute left-1/2 -translate-x-1/2"></div>
-                <div className="flex items-center gap-2 hover-light-dark dark:hover:bg-neutral-900 rounded-xl">
-                    <Menu as="div" className="relative inline-block text-left">
-                        <div>
-                            <MenuButton className="inline-flex w-full justify-center gap-x-1.5 rounded-xl  px-3 py-2 text-sm font-semibold">
-                                {selectedModel || 'Default Model'}
-                                <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
-                            </MenuButton>
-                        </div>
-                        <Transition
-                            enter="transition ease-out duration-100"
-                            enterFrom="transform opacity-0 scale-95"
-                            enterTo="transform opacity-100 scale-100"
-                            leave="transition ease-in duration-75"
-                            leaveFrom="transform opacity-100 scale-100"
-                            leaveTo="transform opacity-0 scale-95"
-                        >
-                            <MenuItems className="absolute left-0 z-10 mt-2 w-48 origin-top-right rounded-2xl  shadow-xl ring-1 ring-black ring-opacity-5 bg-neutral-300 dark:bg-[#171717]">
-                            {models.length <= 0 ? (
-                                <div className="py-1 px-1">
-                                    <MenuItem>
-                                    <div className="animate-pulse">
-                                        <div className="mb-1 h-6 rounded-xl skeleton"></div>
-                                        <div className="mb-1 h-6 rounded-xl skeleton"></div>
-                                        <div className="h-6 rounded-xl skeleton"></div>
-                                    </div>
-                                    </MenuItem>
-                                </div>
-                            ):(
-                                <div className="py-1 px-1">
-                                    {models.map((model) => (
-                                        <MenuItem key={model.id} >
-                                            {({ focus }) => (
-                                                <button
-                                                    onClick={() => {handleModelChange(model.name, model.id, true)}}
-                                                    className={`rounded-xl px-4 w-full py-2 text-sm text-left ${focus? 'bg-neutral-400 dark:bg-neutral-800' : ''}`}
-                                                >
-                                                    {model.name}
-                                                </button>
-                                            )}
-                                        </MenuItem>
-                                    ))}
-                                </div>
-                            )}
-                            </MenuItems>
-                        </Transition>
-                    </Menu>
+                <div className="flex items-center gap-2 hover-light-dark dark:hover:bg-neutral-900 rounded-md">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold">
+                          {selectedModel || 'Default Model'}
+                          <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuLabel>Models</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        
+                          {models.length <= 0 ? (
+                              <DropdownMenuItem className="animate-pulse">
+                                  <div className="skeleton">finding</div>
+                              </DropdownMenuItem>
+                          ):(
+                             models.map((model) => (
+                              <DropdownMenuItem
+                                key={model.id}
+                                onClick={() => handleModelChange(model.name, model.id, true)}
+                              >
+                                {model.name}
+                              </DropdownMenuItem>
+                            ))
+                          )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
                 <div className="flex gap-2 pr-1"></div>
             </div>
