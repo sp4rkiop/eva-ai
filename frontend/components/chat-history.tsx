@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label"
 import { ChatService } from '@/lib/service';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { Search } from 'lucide-react';
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from './ui/context-menu';
 interface ChatTitle {
   id: string;
   title: string;
@@ -368,67 +369,72 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                         }}
                       >
                         <div ref={getOrCreateRef(chatTitle.id)} className={`relative pt-1 pb-1 overflow-x-hidden group`}>
-                          <div className={`group flex items-center h-8 rounded-md px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
-                            <button
-                              className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
-                              onClick={(e) => { 
-                                e.preventDefault(); 
-                                onOldChatClick(chatTitle.id); 
-                                if (window.innerWidth < 768) {
-                                  toggleChatHistoryVisibility();
-                                }
-                              }}
-                            >{chatTitle.title}</button>
-                          </div>
-                          {/* Dropdown menu for each chat title */}
-                          <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100`}>
-                            <Dialog>
-                              <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
-                                    <svg className="w-5 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
-                                      <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
-                                    </svg>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                  <DialogTrigger asChild className="block w-full text-left text-sm">
-                                    <DropdownMenuItem >Rename</DropdownMenuItem>
-                                  </DialogTrigger>
-                                  <DropdownMenuItem onClick={() => {handleDelete(chatTitle.id)}}
-                                          >
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                              <DialogContent className="max-w-[400px] md:max-w-[425px]">
-                                <DialogHeader className="max-md:text-left">
-                                  <DialogTitle>Edit Chat Title</DialogTitle>
-                                  <DialogDescription>
-                                    Click save when you&apos;re done.
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-4 py-4 max-md:justify-start">
-                                  <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">
-                                      Title
-                                    </Label>
-                                    <Input
-                                      id="name"
-                                      defaultValue={chatTitle.title}
-                                      onChange={(e) => setTitle(e.target.value)}
-                                      className="col-span-3"
-                                    />
+                          <Dialog>
+                            <ContextMenu>
+                              <ContextMenuTrigger className={`group flex items-center h-8 rounded-md px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
+                                <button
+                                  className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
+                                  onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    onOldChatClick(chatTitle.id); 
+                                    if (window.innerWidth < 768) {
+                                      toggleChatHistoryVisibility();
+                                    }
+                                  }}
+                                >{chatTitle.title}</button>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <DialogTrigger className="block w-full text-left text-sm"><ContextMenuItem>Rename</ContextMenuItem></DialogTrigger>
+                                <ContextMenuItem onClick={() => {handleDelete(chatTitle.id)}}>Delete</ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                            {/* Dropdown menu for each chat title */}
+                            <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100`}>
+                                <DropdownMenu modal={false}>
+                                  <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
+                                      <svg className="w-5 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
+                                        <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
+                                      </svg>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                    <DialogTrigger className="block w-full text-left text-sm">
+                                      <DropdownMenuItem >Rename</DropdownMenuItem>
+                                    </DialogTrigger>
+                                    <DropdownMenuItem onClick={() => {handleDelete(chatTitle.id)}}>
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                                <DialogContent className="max-w-[400px] md:max-w-[425px]">
+                                  <DialogHeader className="max-md:text-left">
+                                    <DialogTitle>Edit Chat Title</DialogTitle>
+                                    <DialogDescription>
+                                      Click save when you&apos;re done.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="grid gap-4 py-4 max-md:justify-start">
+                                    <div className="grid grid-cols-4 items-center gap-4">
+                                      <Label htmlFor="name" className="text-right">
+                                        Title
+                                      </Label>
+                                      <Input
+                                        id="name"
+                                        defaultValue={chatTitle.title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        className="col-span-3"
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                                <DialogFooter>
-                                  <DialogClose asChild>
-                                    <Button type="button" className="w-fit ml-auto" onClick={() => {handleRename(chatTitle.id, title)}}>
-                                      Save changes
-                                    </Button>
-                                  </DialogClose>
-                                </DialogFooter>
-                              </DialogContent>
-                            </Dialog>
-                          </div>
+                                  <DialogFooter>
+                                    <DialogClose asChild>
+                                      <Button type="button" className="w-fit ml-auto" onClick={() => {handleRename(chatTitle.id, title)}}>
+                                        Save changes
+                                      </Button>
+                                    </DialogClose>
+                                  </DialogFooter>
+                                </DialogContent>
+                            </div>
+                          </Dialog>
                         </div>
                       </CSSTransition>
                     ))}
@@ -438,45 +444,45 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             </div>
           )}
           <div className="w-full left-0 right-0 chat-history">
-            <DropdownMenu>
-              <div className="flex items-center gap-2 rounded-md p-2 text-sm hover-light-dark w-full">
-                <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center overflow-hidden rounded-full">
-                    <div className="relative flex">
-                      <img
-                        alt="User"
-                        loading="lazy"
-                        width="32"
-                        height="32"
-                        decoding="async"
-                        data-nimg="1"
-                        className="rounded-sm"
-                        style={{ color: 'transparent' }}
-                        src={userImage}
-                      />
-                    </div>
+            <div className="flex items-center gap-2 rounded-md p-2 text-sm hover-light-dark w-full">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center overflow-hidden rounded-full">
+                  <div className="relative flex">
+                    <img
+                      alt="User"
+                      loading="lazy"
+                      width="32"
+                      height="32"
+                      decoding="async"
+                      data-nimg="1"
+                      className="rounded-sm"
+                      style={{ color: 'transparent' }}
+                      src={userImage}
+                    />
                   </div>
                 </div>
-                <div className="relative -top-px grow -space-y-px overflow-hidden text-ellipsis whitespace-nowrap text-left">
-                  <div>
-                    {firstName} {lastName}
-                  </div>
+              </div>
+              <div className="relative -top-px grow -space-y-px overflow-hidden text-ellipsis whitespace-nowrap text-left">
+                <div>
+                  {firstName} {lastName}
                 </div>
+              </div>
+              <DropdownMenu>
                 <DropdownMenuTrigger>
                   <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
                     <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
                   </svg>
                 </DropdownMenuTrigger>
-              </div>
-              <DropdownMenuContent>
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <DropdownMenuContent>
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
+                  <DropdownMenuItem>Settings</DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </nav>
       </div>
