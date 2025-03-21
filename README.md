@@ -9,6 +9,7 @@
  </tr>
 </table>
 <div align='center'><img src='https://visitor-badge.laobi.icu/badge?page_id=sp4rkiop.eva-ai'/></div>
+<div align='center'><img src='assets/images/img1.png' alt='Image Demo' /></div>
 Eva is an AI-powered chatbot designed to surpass the functionality of ChatGPT, offering a seamless conversational experience. Built with cutting-edge technologies, it aims to provide an open-source alternative for developers and enthusiasts looking to explore AI chatbots.
 
 ## Table of Contents
