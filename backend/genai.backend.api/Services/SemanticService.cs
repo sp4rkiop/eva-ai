@@ -160,10 +160,9 @@ namespace genai.backend.api.Services
                         fullMessage.Append(chatUpdate.Content);
                         //Console.Write(chatUpdate.Content);
                         await _responseStream.PartialResponse(userId.ToString(), JsonSerializer.Serialize(new { ChatId = chatId.ToString(), PartialContent = chatUpdate.Content }));
-                        await Task.Delay(20);//20ms response stream delay for smooth chat stream
+                        await Task.Delay(16);//20ms response stream delay for smooth chat stream
                     }
                 }
-                await _responseStream.EndStream(userId.ToString());
 
                 var completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens;
 
@@ -190,6 +189,7 @@ namespace genai.backend.api.Services
                 var updatePreparedStatement = _session.Prepare(updateStatement);
                 var updateBoundStatement = updatePreparedStatement.Bind(updatedChatHistoryJson, DateTime.UtcNow, userId, chatId);
                 await _session.ExecuteAsync(updateBoundStatement).ConfigureAwait(false);
+                await _responseStream.EndStream(userId.ToString());
             }
             catch (Exception ex)
             {
@@ -249,10 +249,9 @@ namespace genai.backend.api.Services
                         fullMessage.Append(chatUpdate.Content);
                         //Console.Write(chatUpdate.Content);
                         await _responseStream.PartialResponse(userId.ToString(), JsonSerializer.Serialize(new { ChatId = userId.ToString(), PartialContent = chatUpdate.Content }));
-                        await Task.Delay(20);//20ms response stream delay for smooth chat stream
+                        await Task.Delay(16);//20ms response stream delay for smooth chat stream
                     }
                 }
-                await _responseStream.EndStream(userId.ToString());
                 //newChatHistory.AddMessage(AuthorRole.Assistant, fullMessage.ToString());
                 var completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens;
                 newChatHistory.Add(
@@ -278,7 +277,7 @@ namespace genai.backend.api.Services
                 var preparedStatement = _session.Prepare(insertStatement);
                 var boundStatement = preparedStatement.Bind(userId, newChatId, newTitle, Encoding.UTF8.GetBytes(updatedJsonChatHistory), DateTime.UtcNow, completionToken);
                 await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
-
+                await _responseStream.EndStream(userId.ToString());
                 return newChatId.ToString();
             }
             catch (Exception ex)

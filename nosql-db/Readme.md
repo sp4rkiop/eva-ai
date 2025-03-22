@@ -6,4 +6,4 @@ jdk, jre
 scoop install java/oraclejdk-lts
 scoop install java/oraclejre8
 
-Then normally connect to the cassandra insance and run the cql script to create tables.
+Then normally connect to the scylladb insance and run the cql script to create tables.

@@ -1,0 +1,18 @@
+version: '3.7'
+
+services:
+  scylla-eva:
+    image: scylladb/scylla:latest
+    restart: always
+    container_name: scylla-eva
+    networks:
+      - backend
+    ports:
+      - "9042:9042"  # CQL
+    volumes:
+      - scylla_data:/var/lib/scylla
+    command: --smp 2 --memory 2G # 2 cores and 2GB of memory limit
+
+volumes:
+  scylla_data:
+    driver: local

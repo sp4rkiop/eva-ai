@@ -283,9 +283,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
 
     // Subscribe to the endStream$ observable
     const subscription = chatService.endStream$.subscribe(() => {
-      setTimeout(() => {
-        getConversations();
-      }, 1000);
+      getConversations();
     });
     // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
