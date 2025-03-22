@@ -5,6 +5,7 @@ import Chat from '@/components/chat';
 import { ChatService } from '@/lib/service';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import { useToast } from '@/components/ui/use-toast';
 
 // Extend next-auth session type to include custom properties
 declare module "next-auth" {
@@ -47,6 +48,8 @@ export default function HomePage() {
   const [isInitialized, setIsInitialized] = useState(false);
   const chatService = useMemo(() => ChatService.getInstance(), []);
   const isRefreshing = useRef(false); // Add ref to track refresh state
+  const { toast } = useToast();
+
   const getuId_token = async (): Promise<[string, string]> => {
     try {
       const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
@@ -66,7 +69,14 @@ export default function HomePage() {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to fetch new token");
+      if (!response.ok){
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem refreshing your token. Code: " + response.status,
+          duration: 1500
+        });
+      }
       
       const userid = await response.text();
       const back_auth = response.headers.get('authorization') || '';
@@ -78,7 +88,13 @@ export default function HomePage() {
 
       return [back_auth, userid];
     } catch (error) {
-      console.error("Token refresh failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Token refresh failed:" + error as string,
+        duration: 1500
+      });
+      // console.error("Token refresh failed:", error);
       router.push('/login?error=session_expired');
       return ["", ""];
     }
@@ -103,6 +119,10 @@ export default function HomePage() {
 
         // Refresh token if expired
         if (currentAuth && isTokenExpired(currentAuth)) {
+          toast({
+            description: "Token expired. Refreshing token...",
+            duration: 1500
+          });
           [currentAuth, currentUserId] = await getuId_token();
         }
         if (currentAuth && currentUserId) {

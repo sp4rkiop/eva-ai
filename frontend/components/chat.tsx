@@ -17,6 +17,7 @@ import { ButtonScrollToBottom } from './ui/button-scroll-to-bottom';
 import 'katex/dist/katex.min.css';
 import rehypeKatex from 'rehype-katex';
 import { BlockMath } from 'react-katex';
+import { useToast } from './ui/use-toast';
 
 interface ChatProps {
     chatId?: string;
@@ -49,6 +50,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const userInteractedRef = useRef(userInteracted);
     const isAtBottomRef = useRef(isAtBottom);
+    const { toast } = useToast();
 
     const scrollToBottom = useCallback((instant = false, isUser = false) => {
       if (isUser) {
@@ -63,32 +65,42 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
       }
     }, []);
     const getuId_token = async () => {
-      const userData = {
-        emailId: uMail,
-        firstName: fName,
-        lastName: lName,
-        partner: partner,
-      };
-        await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(userData),
-        }).then(async (response) => {
-            if (!response.ok) {
-              throw new Error("Failed to send user data to the server");
-            }
-            const userid = await response.text();
-            const back_auth = response.headers.get('authorization');
-            // Update session with new token
-            await update({
-              back_auth: back_auth,
-              userid: userid  // Use the resolved text value
-            });
-        
-            return [back_auth, userid];
-          })
+        const userData = {
+            emailId: uMail,
+            firstName: fName,
+            lastName: lName,
+            partner: partner,
+        };
+    
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(userData),
+        });
+    
+        if (!response.ok) {
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem verifying your account. Code: " + response.status,
+            duration: 1500
+          });
+            // throw new Error("Failed to send user data to the server");
+        }
+    
+        const userid = await response.text();
+        const back_auth = response.headers.get('authorization');
+    
+        // Update session with new token
+        await update({
+            back_auth: back_auth,
+            userid: userid,
+        });
+    
+        // Return the token
+        return back_auth;
     };
     const handleMessageSubmit = async (text: string) => {
         try {
@@ -120,7 +132,13 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                     chatId: currentChatId
                 })
             });
-            if (response.status == 401 || !response.ok) {
+            if (!response.ok) {
+                toast({
+                  variant: "destructive",
+                  title: "Uh oh! Something went wrong.",
+                  description: `There was a problem with your conversation. Status: ${response.status} : ${await response.text().then(t => t.split('\n')[0])}`,
+                  duration: 1500
+                });
                 const newToken = await getuId_token();
                 response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
                   method: 'POST',
@@ -141,7 +159,13 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                 window.history.pushState({}, '', `/c/${newChatId}`);
             }
         } catch (error) {
-            console.error('Error:', error);
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "Failed to send your message. Error: "+error as string,
+            duration: 1500
+          });
+            // console.error('Error:', error);
         }
     };
     const SkeletonLoader = () => (
@@ -195,7 +219,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
         }
         )
           .then((response) => 
-            response.status == 401 ? getuId_token() : response.json())
+            response.status === 401 ? getuId_token() : response.json())
           .then((data) => {
             if (data && data.length > 0) {
               const newMessages: Message[] = data
@@ -213,7 +237,13 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             setloadingConversaion(false);
           });
       } catch (error) {
-        console.error("Error fetching chat history:", error);
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "Failed to retrieve conversation:" + error as string,
+          duration: 1500
+        });
+        // console.error("Error fetching chat history:", error);
         setloadingConversaion(false);
       }
     }

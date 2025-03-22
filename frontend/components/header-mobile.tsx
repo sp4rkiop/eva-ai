@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useToast } from './ui/use-toast';
 interface Model {
   id: number;
   name: string;
@@ -20,7 +21,7 @@ interface Model {
 interface HeaderProps {
   service: ChatService;
   onNewChatClick: () => void;
-  getuId_token: () => Promise<void>;
+  getuId_token: () => Promise<string | null>;
   back_auth: string;
 }
 
@@ -29,9 +30,10 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
   const fetchedRef = useRef(false);
-  
+  const { toast } = useToast();
+
   useEffect(() => {
-    const getModels = async (newToken: void): Promise<void> => {
+    const getModels = async (newToken?: string | null): Promise<void> => {
       try{
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/models`, {
           method: "GET",
@@ -40,7 +42,13 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
             "Authorization": `Bearer ${back_auth}`
           },
         });
-        if (response.status == 401) {
+        if (response.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem verifying your account. Code: " + response.status,
+            duration: 1500
+          });
           const newToken = await getuId_token();
           return getModels(newToken);
         }
@@ -55,7 +63,13 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
         }
       }
       catch(error) {
-        console.error('Error:', error);
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "Failed to maintain Models:" + error as string,
+          duration: 1500
+        });
+        // console.error('Error:', error);
       }
     };
     // Load models from session storage if available

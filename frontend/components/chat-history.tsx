@@ -43,7 +43,7 @@ interface ChatHistoryProps {
   partner: string;
   chatId: string | undefined;
   chatService: ChatService;
-  getuId_token: () => Promise<void>;
+  getuId_token: () => Promise<string | null>;
   back_auth: string;
   onNewChatClick: () => void;
   onOldChatClick: (iD?: string) => void;
@@ -103,12 +103,19 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       },
     }).then(async (res) => {
       if(res.status === 401) {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem verifying your account. Code: " + res.status,
+          duration: 1500
+        });
         await getuId_token();
         return handleRename(chatId, newTitle);
       }else if (res.status === 204) {
         toast({
           description: "Chat title updated",
-        })
+          duration: 1500
+        });
         const updatedTitles = chatTitles.map((t) => {
           if (t.id === chatId) {
             return { ...t, title: newTitle };
@@ -137,12 +144,19 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       body: JSON.stringify({ delete: true }),
     }).then(async (res) => {
       if(res.status === 401) {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem verifying your account. Code: " + res.status,
+          duration: 1500
+        });
         await getuId_token();
         return handleDelete(chatId);
       }else if (res.status === 204) {
         toast({
-          description: "Chat removed",
-        })
+          description: "Chat deleted",
+          duration: 1500
+        });
         const updatedTitles = chatTitles.filter((t) => t.id !== chatId);
         setChatTitles(updatedTitles);
         
@@ -214,7 +228,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   .map(([name, chats]) => ({ name, chats }));
 
   useEffect(() => {
-    const getConversations = async (newToken?: void): Promise<void> => {
+    const getConversations = async (newToken?: string | null): Promise<void> => {
       try{
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversations`, {
           method: "GET",
@@ -223,7 +237,13 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             "Authorization": `Bearer ${back_auth}`
           },
         });
-        if (response.status == 401) {
+        if (response.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "There was a problem verifying your account. Code: " + response.status,
+            duration: 1500
+          });
           const newToken = await getuId_token();
           return getConversations(newToken);
         }
@@ -244,7 +264,13 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         setIsFetchingChatTitles(false);
       }
       catch(error) {
-        console.error('Error:', error);
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "Failed to get your chats:" + error as string,
+          duration: 1500
+        });
+        // console.error('Error:', error);
         setIsFetchingChatTitles(false);
         setChatTitles([]);
       }

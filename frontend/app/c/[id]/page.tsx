@@ -5,6 +5,8 @@ import Chat from "@/components/chat";
 import { ChatService } from '@/lib/service';
 import {useMemo, useEffect, useState, useRef } from 'react';
 import LoadingSpinner from '@/components/ui/loading-spinner';
+import { useToast } from '@/components/ui/use-toast';
+
 // interface IndexPageProps {
 // params: {
 //     id: string;
@@ -54,6 +56,7 @@ export default function IndexPage() {
   const [isInitialized, setIsInitialized] = useState(false);
   const chatService = useMemo(() => ChatService.getInstance(), []);
   const isRefreshing = useRef(false); // Add ref to track refresh state
+  const { toast } = useToast();
   
   const getuId_token = async (): Promise<[string, string]> => {
     try {
@@ -74,7 +77,14 @@ export default function IndexPage() {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to fetch new token");
+      if (!response.ok){
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem refreshing your token. Code: " + response.status,
+          duration: 1500
+        });
+      }
       
       const userid = await response.text();
       const back_auth = response.headers.get('authorization') || '';
@@ -86,7 +96,13 @@ export default function IndexPage() {
 
       return [back_auth, userid];
     } catch (error) {
-      console.error("Token refresh failed:", error);
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Token refresh failed:" + error as string,
+        duration: 1500
+      });
+      // console.error("Token refresh failed:", error);
       router.push('/login?error=session_expired');
       return ["", ""];
     }
@@ -110,6 +126,10 @@ export default function IndexPage() {
 
           // Refresh token if expired
           if (currentAuth && isTokenExpired(currentAuth)) {
+            toast({
+              description: "Token expired. Refreshing token...",
+              duration: 1500
+            });
             [currentAuth, currentUserId] = await getuId_token();
           }
 
