@@ -391,6 +391,21 @@ useEffect(() => {
                                                                         p({ children }) {
                                                                           return <p className="mb-2 last:mb-0">{children}</p>
                                                                         },
+                                                                        a({ node, children, href, ...props }) {
+                                                                          // Check if it's an external URL
+                                                                          const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
+                                                                          
+                                                                          return (
+                                                                            <a 
+                                                                              {...props}
+                                                                              href={href}
+                                                                              target={isExternal ? "_blank" : undefined}
+                                                                              rel={isExternal ? "noopener noreferrer" : undefined}
+                                                                            >
+                                                                              {children}
+                                                                            </a>
+                                                                          );
+                                                                        },
                                                                         code({ node, className, children, ...props }) {
                                                                           // if (children.length) {
                                                                           //   if (children[0] == '▍') {
