@@ -139,19 +139,23 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                   description: `There was a problem with your conversation. Status: ${response.status} : ${await response.text().then(t => t.split('\n')[0])}`,
                   duration: 1500
                 });
-                const newToken = await getuId_token();
-                response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json',
-                      "Authorization": `Bearer ${newToken}`
-                  },
-                  body: JSON.stringify({
-                      modelId: chatService.selectedModelId$.value,
-                      userInput: text,
-                      chatId: currentChatId
-                  })
-              });
+                if (response.status === 401) {
+                    const newToken = await getuId_token();
+                    response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
+                      method: 'POST',
+                      headers: {
+                          'Content-Type': 'application/json',
+                          "Authorization": `Bearer ${newToken}`
+                      },
+                      body: JSON.stringify({
+                          modelId: chatService.selectedModelId$.value,
+                          userInput: text,
+                          chatId: currentChatId
+                      })
+                    });
+                } else {
+                    return;
+                }
             }
             const newChatId = await response.text();
             if(newChatId!=null && newChatId.length!= 0) {
