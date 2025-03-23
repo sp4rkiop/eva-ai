@@ -10,7 +10,6 @@ using Newtonsoft.Json;
 using System.Net;
 using System.Text.RegularExpressions;
 using System.Web;
-using MySqlX.XDevAPI;
 
 namespace genai.backend.api.Plugins
 {

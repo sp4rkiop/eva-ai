@@ -2,7 +2,6 @@
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using Microsoft.SemanticKernel;
-using StackExchange.Redis;
 using System.Text;
 using System.Text.Json;
 using Tiktoken;
@@ -20,7 +19,6 @@ namespace genai.backend.api.Services
         private readonly IConfiguration _configuration;
         private readonly Kernel chatKernel;
         private readonly IChatCompletionService chatCompletion;
-        private readonly IConnectionMultiplexer _redisConnection;
         private readonly Cassandra.ISession _session;
         private readonly ResponseStream _responseStream;
         private readonly UserService _userService;
@@ -38,9 +36,12 @@ namespace genai.backend.api.Services
             _responseStream = responseStream;
             _userService = userService;
             _cache = cache;
-            /*// Get values from appsettings.json
-            var redisConnection = _configuration["ConnectionStrings:Redis"];
-            _redisConnection = ConnectionMultiplexer.Connect(redisConnection);*/
+        }
+        public class ChatResult
+        {
+            public string ChatId { get; set; }
+            public bool Success { get; set; }
+            public string ErrorMessage { get; set; }
         }
 
         /// <summary>
@@ -49,28 +50,28 @@ namespace genai.backend.api.Services
         /// <param name="userId">The user ID.</param>
         /// <param name="userInput">The user input.</param>
         /// <param name="chatId">The chat ID.</param>
-        public async Task<string> semanticChatAsync(Guid userId, Guid modelId, string userInput, string? chatId = null)
+        public async Task<ChatResult> semanticChatAsync(Guid userId, Guid modelId, string userInput, string? chatId = null)
         {
             try
             {
                 bool isModelSubscribed = await _cache.GetOrCreateAsync($"subscribed-{userId}-{modelId}", async entry =>
                 {
                     entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-                    var checkSubscriptionStatement = "SELECT COUNT(*) FROM usersubscriptions WHERE userid = ? AND modelid = ?";
+                    var checkSubscriptionStatement = "SELECT modelid FROM usersubscriptions WHERE userid = ? AND modelid = ? LIMIT 1";
                     var preparedStatement = _session.Prepare(checkSubscriptionStatement);
                     var boundStatement = preparedStatement.Bind(userId, modelId);
                     var result = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
-                    return result.First().GetValue<long>(0) > 0;
+                    return result.FirstOrDefault() != null;
                 });
 
                 if (!isModelSubscribed)
                 {
-                    throw new Exception("Either Model is not available or you are not subscribed to it.");
+                    return new ChatResult { Success = false, ErrorMessage = "Either Model is not available or you are not subscribed to it." };
                 }
                 var GptModel = await _cache.GetOrCreateAsync($"model-details-{modelId}", async entry =>
                 {
                     entry.AbsoluteExpirationRelativeToNow = _cacheDuration;
-                    var getModelDetailsStatement = "SELECT deploymentname, endpoint, apikey FROM availablemodels WHERE deploymentid = ?";
+                    var getModelDetailsStatement = "SELECT deploymentname, endpoint, apikey FROM availablemodels WHERE deploymentid = ? AND isactive = true";
                     var preparedStatement = _session.Prepare(getModelDetailsStatement);
                     var boundStatement = preparedStatement.Bind(modelId);
                     var result = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
@@ -95,18 +96,18 @@ namespace genai.backend.api.Services
                 if (chatId != null)
                 {
                     ContinueExistingChat(chatKernel, chatCompletion, userId, Guid.Parse(chatId), userInput);
-                    return null;
+                    return new ChatResult { Success = true };
                 }
                 else
                 {
-                    return await StartNewChat(chatKernel, chatCompletion, userId, userInput);
+                    var newChatId = await StartNewChat(chatKernel, chatCompletion, userId, userInput);
+                    return new ChatResult { Success = true, ChatId = newChatId };
 
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error processing semantic function: {ex.Message}");
-                throw;
+                return new ChatResult { Success = false, ErrorMessage = $"SERVER handling error: {ex.Message}" };
             }
         }
 
@@ -115,7 +116,7 @@ namespace genai.backend.api.Services
             try
             {
                 // Prepare and execute the CQL query to fetch chat history by chatId
-                var chatSelectStatement = "SELECT chathistoryjson FROM chathistory WHERE userid = ? AND chatid = ?";
+                var chatSelectStatement = "SELECT chathistoryjson, nettokenconsumption FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ?";
                 var preparedStatement = _session.Prepare(chatSelectStatement);
                 var boundStatement = preparedStatement.Bind(userId, chatId);
                 var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
@@ -127,7 +128,9 @@ namespace genai.backend.api.Services
                     return;
                 }
                 var oldchatHistory = JsonSerializer.Deserialize<Microsoft.SemanticKernel.ChatCompletion.ChatHistory>(Encoding.UTF8.GetString(row.GetValue<byte[]>("chathistoryjson")));
+                int oldTokenConsumption = row.GetValue<int>("nettokenconsumption");
                 //oldchatHistory.AddMessage(AuthorRole.User, userInput);
+                int promptTokens = TokenCalculator(chatCompletion.GetModelId(), userInput, null).PromptTokens ?? 0;
                 oldchatHistory.Add(
                     new()
                     {
@@ -138,7 +141,7 @@ namespace genai.backend.api.Services
                         ModelId = chatCompletion.GetModelId(),
                         Metadata = new Dictionary<string, object?>
                         {
-                            { "TokenConsumed", TokenCalculator(chatCompletion.GetModelId(), userInput, null).PromptTokens },
+                            { "TokenConsumed", promptTokens },
                             { "CreatedOn", DateTime.UtcNow.ToString() }
                         }.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
                     }
@@ -164,7 +167,7 @@ namespace genai.backend.api.Services
                     }
                 }
 
-                var completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens;
+                int completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens ?? 0;
 
                 oldchatHistory.Add(
                     new()
@@ -185,9 +188,9 @@ namespace genai.backend.api.Services
                 //oldchatHistory.AddAssistantMessage(fullMessage.ToString());
                 // Serialize the updated chat history and prepare to update in Cassandra
                 var updatedChatHistoryJson = Encoding.UTF8.GetBytes(JsonSerializer.Serialize<Microsoft.SemanticKernel.ChatCompletion.ChatHistory>(oldchatHistory));
-                var updateStatement = "UPDATE chathistory SET chathistoryjson = ? , createdon = ? WHERE userid = ? AND chatid = ?";
+                var updateStatement = "UPDATE chathistory SET chathistoryjson = ? , createdon = ? , nettokenconsumption = ? WHERE userid = ? AND chatid = ?";
                 var updatePreparedStatement = _session.Prepare(updateStatement);
-                var updateBoundStatement = updatePreparedStatement.Bind(updatedChatHistoryJson, DateTime.UtcNow, userId, chatId);
+                var updateBoundStatement = updatePreparedStatement.Bind(updatedChatHistoryJson, DateTime.UtcNow, oldTokenConsumption + promptTokens + completionToken, userId, chatId);
                 await _session.ExecuteAsync(updateBoundStatement).ConfigureAwait(false);
                 await _responseStream.EndStream(userId.ToString());
             }
@@ -218,6 +221,7 @@ namespace genai.backend.api.Services
                 var systemMessage = await promptTemplateFactory.Create(new PromptTemplateConfig(promptTemplate)).RenderAsync(chatKernel);
                 var newChatHistory = new Microsoft.SemanticKernel.ChatCompletion.ChatHistory(systemMessage);
                 //newChatHistory.AddMessage(AuthorRole.User, userInput);
+                int promptTokens = TokenCalculator(chatCompletion.GetModelId(), userInput, null).PromptTokens ?? 0;
                 newChatHistory.Add(
                     new()
                     {
@@ -228,7 +232,7 @@ namespace genai.backend.api.Services
                         ModelId = chatCompletion.GetModelId(),
                         Metadata = new Dictionary<string, object?>
                         {
-                            { "TokenConsumed", TokenCalculator(chatCompletion.GetModelId(), userInput, null).PromptTokens },
+                            { "TokenConsumed", promptTokens },
                             { "CreatedOn", DateTime.UtcNow.ToString() }
                         }.ToDictionary(kvp => kvp.Key, kvp => (object)kvp.Value)
                     }
@@ -253,7 +257,7 @@ namespace genai.backend.api.Services
                     }
                 }
                 //newChatHistory.AddMessage(AuthorRole.Assistant, fullMessage.ToString());
-                var completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens;
+                int completionToken = TokenCalculator(chatCompletion.GetModelId(), null, fullMessage.ToString()).CompletionTokens ?? 0;
                 newChatHistory.Add(
                     new()
                     {
@@ -273,9 +277,9 @@ namespace genai.backend.api.Services
                 var updatedJsonChatHistory = JsonSerializer.Serialize<Microsoft.SemanticKernel.ChatCompletion.ChatHistory>(newChatHistory);
                 var newTitle = await NewChatTitle(chatKernel, newChatHistory.ElementAt(1).Content.ToString());
                 // Prepare and execute the CQL query to insert new chat history
-                var insertStatement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption) VALUES (?, ?, ?, ?, ?, ?) IF NOT EXISTS";
+                var insertStatement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption, visible) VALUES (?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS";
                 var preparedStatement = _session.Prepare(insertStatement);
-                var boundStatement = preparedStatement.Bind(userId, newChatId, newTitle, Encoding.UTF8.GetBytes(updatedJsonChatHistory), DateTime.UtcNow, completionToken);
+                var boundStatement = preparedStatement.Bind(userId, newChatId, newTitle, Encoding.UTF8.GetBytes(updatedJsonChatHistory), DateTime.UtcNow, promptTokens + completionToken, true);
                 await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
                 await _responseStream.EndStream(userId.ToString());
                 return newChatId.ToString();
@@ -296,7 +300,7 @@ namespace genai.backend.api.Services
             try
             {
                 // Prepare and execute the CQL query to fetch chat history by chatId
-                var chatSelectStatement = "SELECT chathistoryjson FROM chathistory WHERE userid = ? AND chatid = ?";
+                var chatSelectStatement = "SELECT chathistoryjson FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ?";
                 var preparedStatement = _session.Prepare(chatSelectStatement);
                 var boundStatement = preparedStatement.Bind(userId, chatId);
                 var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);

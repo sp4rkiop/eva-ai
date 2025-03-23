@@ -90,7 +90,7 @@ namespace genai.backend.api.Services
             try
             {
                 // Prepare and execute the CQL query to fetch chat history
-                var chatSelectStatement = "SELECT chatid, chattitle, createdon FROM chathistory WHERE userid = ?";
+                var chatSelectStatement = "SELECT chatid, chattitle, createdon FROM chathistory_by_visible WHERE visible = true AND userid = ?";
                 var preparedStatement = _session.Prepare(chatSelectStatement);
                 var boundStatement = preparedStatement.Bind(userId);
                 var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
@@ -134,7 +134,7 @@ namespace genai.backend.api.Services
             {
                 // Dynamically create the query with the correct number of placeholders for IN clause
                 var placeholders = string.Join(",", modelIds.Select(_ => "?"));
-                var deploymentNameSelectStatement = $"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders})";
+                var deploymentNameSelectStatement = $"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true";
 
                 // Prepare the dynamically constructed query
                 var deploymentNamePreparedStatement = _session.Prepare(deploymentNameSelectStatement);
@@ -160,12 +160,12 @@ namespace genai.backend.api.Services
 
         public async Task<bool> RenameConversation(Guid userId, Guid chatId, string newTitle)
         {
-            var chatSelectStatement = "SELECT chatid FROM chathistory WHERE userid = ? AND chatid = ?";
+            var chatSelectStatement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ? LIMIT 1";
             var preparedStatement = _session.Prepare(chatSelectStatement);
             var boundStatement = preparedStatement.Bind(userId, chatId);
             var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
 
-            if (!resultSet.Any())
+            if (resultSet.FirstOrDefault() == null)
             {
                 return false; // Chat not found
             }
@@ -180,17 +180,17 @@ namespace genai.backend.api.Services
 
         public async Task<bool> DeleteConversation(Guid userId, Guid chatId)
         {
-            var chatSelectStatement = "SELECT chatid FROM chathistory WHERE userid = ? AND chatid = ?";
+            var chatSelectStatement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ? LIMIT 1";
             var preparedStatement = _session.Prepare(chatSelectStatement);
             var boundStatement = preparedStatement.Bind(userId, chatId);
             var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
 
-            if (!resultSet.Any())
+            if (resultSet.FirstOrDefault() == null)
             {
                 return false; // Chat not found
             }
 
-            var chatDeleteStatement = "DELETE FROM chathistory WHERE userid = ? AND chatid = ?";
+            var chatDeleteStatement = "UPDATE chathistory SET visible = false WHERE userid = ? AND chatid = ?";
             var deletePreparedStatement = _session.Prepare(chatDeleteStatement);
             var deleteBoundStatement = deletePreparedStatement.Bind(userId, chatId);
             await _session.ExecuteAsync(deleteBoundStatement).ConfigureAwait(false);

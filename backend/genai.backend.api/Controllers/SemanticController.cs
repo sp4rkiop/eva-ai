@@ -30,18 +30,16 @@ namespace genai.backend.api.Controllers
                 var userId = HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sid)?.Value;
                 if (userId != null && requestBody != null && !string.IsNullOrEmpty(requestBody.userInput))
                 {
-                    var ChatId = await _semanticService.semanticChatAsync(Guid.Parse(userId), requestBody.modelId, requestBody.userInput, requestBody.chatId);
-
-                    if (ChatId != null)
+                    var result = await _semanticService.semanticChatAsync(Guid.Parse(userId), 
+                        requestBody.modelId, requestBody.userInput, requestBody.chatId);
+                    
+                    if (!result.Success)
                     {
-                        // If a new chat is started, return the new chat ID
-                        return Ok(ChatId);
+                        // Return the error message to the client
+                        return BadRequest(result.ErrorMessage);
                     }
-                    else
-                    {
-                        // If continuing an existing chat, return success
-                        return Ok();
-                    }
+                    
+                    return Ok(result.ChatId);
                 }
                 return BadRequest();
             }

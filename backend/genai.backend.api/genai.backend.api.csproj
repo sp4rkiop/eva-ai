@@ -11,19 +11,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CassandraCSharpDriver" Version="3.20.1" />
+    <PackageReference Include="CassandraCSharpDriver" Version="3.22.0" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.65" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
-    <PackageReference Include="Microsoft.SemanticKernel" Version="1.17.2" />
-    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
-    <PackageReference Include="MySql.Data" Version="9.0.0" />
-    <PackageReference Include="MySql.EntityFrameworkCore" Version="8.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.3" />
+    <PackageReference Include="Microsoft.SemanticKernel" Version="1.42.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="StackExchange.Redis" Version="2.7.20" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.7.2" />
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
-    <PackageReference Include="Tiktoken" Version="2.0.3" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.0.0" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.7.0" />
+    <PackageReference Include="Tiktoken" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>

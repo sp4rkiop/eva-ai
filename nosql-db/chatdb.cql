@@ -8,24 +8,30 @@ WITH replication = {
 CREATE TABLE IF NOT EXISTS chatdb.chathistory (
 	userid uuid,
 	chatid uuid,
+	visible boolean,
 	chathistoryjson blob,
 	chattitle text,
 	createdon timestamp,
 	nettokenconsumption int,
 	PRIMARY KEY (userid, chatid)
 );
+CREATE MATERIALIZED VIEW IF NOT EXISTS chatdb.chathistory_by_visible AS
+SELECT userid, chatid, chathistoryjson, chattitle, createdon, nettokenconsumption
+FROM chatdb.chathistory
+WHERE visible IS NOT NULL AND userid IS NOT NULL AND chatid IS NOT NULL
+PRIMARY KEY (visible, userid, chatid);
 
 CREATE TABLE IF NOT EXISTS chatdb.availablemodels (
-	deploymentid uuid,
-	apikey text,
-	deploymentname text,
-	endpoint text,
-	isactive boolean,
-	modelname text,
-	modeltype text,
-	modelversion text,
-	provider text,
-	PRIMARY KEY (deploymentid)
+    deploymentid uuid,
+    isactive boolean,
+    apikey text,
+    deploymentname text,
+    endpoint text,
+    modelname text,
+    modeltype text,
+    modelversion text,
+    provider text,
+    PRIMARY KEY ((deploymentid), isactive)
 );
 
 CREATE TABLE IF NOT EXISTS chatdb.usersubscriptions (

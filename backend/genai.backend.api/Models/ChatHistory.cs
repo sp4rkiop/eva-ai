@@ -10,5 +10,6 @@ namespace genai.backend.api.Models
         public byte[] ChatHistoryJson { get; set; } // BLOB is mapped to byte array
         public DateTime CreatedOn { get; set; }
         public int NetTokenConsumption { get; set; }
+        public bool visible { get; set; }
     }
 }
