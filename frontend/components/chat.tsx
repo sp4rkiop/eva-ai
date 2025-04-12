@@ -375,156 +375,155 @@ useEffect(() => {
   }, [messages, userInteracted]);
 
     return (
-        <VisibilityProvider>
-            <div className="relative z-0 flex h-dvh w-full overflow-hidden">
-                <ChatHistory firstName={fName} lastName={lName} userImage={uImg} uMail={uMail} partner={partner} chatId={currentChatId} chatService={chatService} getuId_token={getuId_token} back_auth={back_auth} onNewChatClick={() => handleNewChat()} onOldChatClick={(iD? : string) => handleOldChat(iD)}/>
-                <div className="relative flex-1 flex-col overflow-hidden">
-                    <div className='flex-1 overflow-auto'>
-                        <Sidebar/>
-                        <div className="flex h-dvh flex-col">
-                            <HeaderMobile service={chatService} onNewChatClick={() => handleNewChat()} getuId_token={getuId_token} back_auth={back_auth} /><HeaderDesktop service={chatService} getuId_token={getuId_token} back_auth={back_auth} />
-                            <div className='flex h-full overflow-y-auto'>
-                              <div 
-                                ref={chatContainerRef}
-                                className="relative flex-1 overflow-y-auto" 
-                                style={{ scrollBehavior: 'smooth' }}
-                              >
-                                <div className="flex flex-col-reverse">
-                                  <div className="translateZ(0px)">
-                                  {(messages.length > 0) &&
-                                      (messages.map((message, index) => (
-                                              <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
-                                                {/* <div className="h-1 bg-gradient-to-r from-black to-black mx-auto gap-3 md:px-5 lg:px-1 xl:px-5 mb-5 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem]"></div> */}
-                                                  <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
-                                                      <div className="flex-shrink-0 flex flex-col relative items-end">
-                                                          <div>
-                                                              <div className="pt-0.5">
-                                                                  <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
-                                                                      <div className="relative flex">
-                                                                      {message.role === 'user' ? 
-                                                                      (<img alt="User" loading="lazy" width="24" height="24" decoding="async" data-nimg="1" className="rounded-sm" style={{color: 'transparent'}} src={uImg}/>) 
-                                                                      : (<img className="mx-auto h-6 w-6 " src="/icon.svg" alt="Eva" />)}
-                                                                      </div>
-                                                                  </div>
-                                                              </div>
-                                                          </div>
-                                                      </div>
-                                                      <div className='relative overflow-hidden flex w-full flex-col'>
-                                                          <div className="font-bold select-none capitalize">
-                                                            {message.role==='user'? (fName):('Eva')}</div>
-                                                            <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
-                                                              <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
-                                                                {message.isPlaceholder ? (
-                                                                    <SkeletonLoader />
-                                                                ) : (
-                                                                    message.role === 'assistant' ? (<MemoizedReactMarkdown
-                                                                      className="pl-4 prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
-                                                                      remarkPlugins={[remarkGfm, remarkMath]}
-                                                                      rehypePlugins={[rehypeKatex]}
-                                                                      components={{
-                                                                        p({ children }) {
-                                                                          return <p className="mb-2 last:mb-0">{children}</p>
-                                                                        },
-                                                                        a({ node, children, href, ...props }) {
-                                                                          // Check if it's an external URL
-                                                                          const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
-                                                                          
-                                                                          return (
-                                                                            <a 
-                                                                              {...props}
-                                                                              href={href}
-                                                                              target={isExternal ? "_blank" : undefined}
-                                                                              rel={isExternal ? "noopener noreferrer" : undefined}
-                                                                            >
-                                                                              {children}
-                                                                            </a>
-                                                                          );
-                                                                        },
-                                                                        code({ node, className, children, ...props }) {
-                                                                          // if (children.length) {
-                                                                          //   if (children[0] == '▍') {
-                                                                          //     return (
-                                                                          //       <span className="mt-1 cursor-default animate-pulse">▍</span>
-                                                                          //     )
-                                                                          //   }
-                                                            
-                                                                          //   children[0] = (children[0] as string).replace('`▍`', '▍')
-                                                                          // }
-                                                                          if (className?.startsWith('math')) {
-                                                                            return <BlockMath math={String(children)} />
-                                                                          }
-                                                                          if (className === 'language-math') {
-                                                                            return <BlockMath math={String(children).replace(/\n$/, '')} />
-                                                                          }
-                                                            
-                                                                          const match = /language-(\w+)/.exec(className || '')
-                                                            
-                                                                          // if (inline) {
-                                                                          //   return (
-                                                                          //     <code className={className} {...props}>
-                                                                          //       {children}
-                                                                          //     </code>
-                                                                          //   )
-                                                                          // }
-                                                            
-                                                                          return match ? (
-                                                                            <CodeBlock
-                                                                              key={Math.random()}
-                                                                              language={(match && match[1]) || ''}
-                                                                              value={String(children).replace(/\n$/, '')}
-                                                                              {...props}
-                                                                            />
-                                                                          ) : (
-                                                                            <code className={className} {...props}>
-                                                                              {children}
-                                                                            </code>
-                                                                          )
-                                                                        }
-                                                                      }}
-                                                                    >
-                                                                      {message.text}
-                                                                    </MemoizedReactMarkdown>
-                                                                    ) : (
-                                                                      <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
-                                                                    )
-                                                                )}
-                                                              </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                          ))
-                                      )}
-                                      <div ref={messagesEndRef} />
+      <VisibilityProvider>
+      <div className="relative z-0 flex h-dvh w-full overflow-hidden">
+        <ChatHistory firstName={fName} lastName={lName} userImage={uImg} uMail={uMail} partner={partner} chatId={currentChatId} chatService={chatService} getuId_token={getuId_token} back_auth={back_auth} onNewChatClick={() => handleNewChat()} onOldChatClick={(iD?: string) => handleOldChat(iD)} />
+        <div className="relative flex-1 flex-col overflow-hidden">
+          <div className='flex-1 overflow-auto'>
+            <Sidebar />
+            <div className="flex h-dvh flex-col">
+              <HeaderMobile service={chatService} onNewChatClick={() => handleNewChat()} getuId_token={getuId_token} back_auth={back_auth} />
+              <HeaderDesktop service={chatService} getuId_token={getuId_token} back_auth={back_auth} />
+              <div className='flex h-full overflow-y-auto'>
+                <div
+                  ref={chatContainerRef}
+                  className="relative flex-1 overflow-y-auto"
+                  style={{ scrollBehavior: 'smooth' }}
+                >
+                  <div className="flex flex-col-reverse">
+                    <div className="translateZ(0px)">
+                      {(messages.length > 0) &&
+                        (messages.map((message, index) => (
+                          <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
+                            <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
+                              <div className="flex-shrink-0 flex flex-col relative items-end">
+                                <div>
+                                  <div className="pt-0.5">
+                                    <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
+                                      <div className="relative flex">
+                                        {message.role === 'user' ?
+                                          (<img alt="User" loading="lazy" width="24" height="24" decoding="async" data-nimg="1" className="rounded-sm" style={{ color: 'transparent' }} src={uImg} />)
+                                          : (<img className="mx-auto h-6 w-6 " src="/icon.svg" alt="Eva" />)}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  {loadingConversaion ? (
-                                    <div className="py-16">
-                                      <LoadingSpinner show={true} />
-                                    </div>
-                                  ) : messages.length === 0 ? (
-                                    <div className="py-16">
-                                      <Greet />
-                                    </div>
-                                  ) : null}
-                                </div>
-                                <div className="sticky bottom-4 right-4 z-20 flex justify-center">
-                                  <ButtonScrollToBottom 
-                                    isAtBottom={isAtBottom}
-                                    scrollToBottom={() => scrollToBottom(false, true)}
-                                    // className="mr-4"
-                                  />
+                              </div>
+                              <div className='relative overflow-hidden flex w-full flex-col'>
+                                <div className="font-bold select-none capitalize">
+                                  {message.role === 'user' ? (fName) : ('Eva')}</div>
+                                <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
+                                  <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
+                                    {message.isPlaceholder ? (
+                                      <SkeletonLoader />
+                                    ) : (
+                                      message.role === 'assistant' ? (<MemoizedReactMarkdown
+                                        className="pl-4 prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
+                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                        rehypePlugins={[rehypeKatex]}
+                                        components={{
+                                          p({ children }) {
+                                            return <p className="mb-2 last:mb-0">{children}</p>
+                                          },
+                                          a({ node, children, href, ...props }) {
+                                            const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
+                                            return (
+                                              <a
+                                                {...props}
+                                                href={href}
+                                                target={isExternal ? "_blank" : undefined}
+                                                rel={isExternal ? "noopener noreferrer" : undefined}
+                                              >
+                                                {children}
+                                              </a>
+                                            );
+                                          },
+                                          code({ node, className, children, ...props }) {
+                                            if (className?.startsWith('math')) {
+                                              return <BlockMath math={String(children)} />
+                                            }
+                                            if (className === 'language-math') {
+                                              return <BlockMath math={String(children).replace(/\n$/, '')} />
+                                            }
+                                            const match = /language-(\w+)/.exec(className || '')
+                                            return match ? (
+                                              <CodeBlock
+                                                key={Math.random()}
+                                                language={(match && match[1]) || ''}
+                                                value={String(children).replace(/\n$/, '')}
+                                                {...props}
+                                              />
+                                            ) : (
+                                              <code className={className} {...props}>
+                                                {children}
+                                              </code>
+                                            )
+                                          }
+                                        }}
+                                      >
+                                        {message.text}
+                                      </MemoizedReactMarkdown>
+                                      ) : (
+                                        <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
+                                      )
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <Input isActive={isAssistantTyping} onSubmit={handleMessageSubmit} messagesLength={messages.length} showSampleInput={loadingConversaion}/>
-                        </div>
+                          </div>
+                        ))
+                      )}
+                      <div ref={messagesEndRef} />
                     </div>
+                  </div>
+                  <div className="sticky bottom-4 right-4 z-20 flex justify-center">
+                      <ButtonScrollToBottom 
+                        isAtBottom={isAtBottom}
+                        scrollToBottom={() => scrollToBottom(false, true)}
+                      />
+                  </div>
+                  {/* Conditional rendering for empty state */}
+                  {messages.length === 0 && !loadingConversaion && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <div className="py-2 md:py-8">
+                        <Greet />
+                      </div>
+                      <div className="w-full max-w-3xl">
+                        <Input 
+                          isActive={isAssistantTyping} 
+                          onSubmit={handleMessageSubmit} 
+                          messagesLength={messages.length} 
+                          showSampleInput={loadingConversaion}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {loadingConversaion && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="py-16">
+                        <LoadingSpinner show={true} />
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </div>
+              
+              {/* Regular input position when messages exist */}
+              {messages.length > 0 && (
+                <Input 
+                  isActive={isAssistantTyping} 
+                  onSubmit={handleMessageSubmit} 
+                  messagesLength={messages.length} 
+                  showSampleInput={loadingConversaion}
+                />
+              )}
             </div>
-        </VisibilityProvider>
+          </div>
+        </div>
+      </div>
+    </VisibilityProvider>
     );
 };
 

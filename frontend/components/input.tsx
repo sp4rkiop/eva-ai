@@ -57,10 +57,10 @@ const Input: React.FC<InputProps> = ({isActive, onSubmit, messagesLength, showSa
     };
 
     return (
-        <div className="w-full pt-2 md:pt-0 dark:border-white/20 md:border-transparent md:dark:border-transparent md:w-[calc(100%-.5rem)]">
+        <div className="w-full pt-2 md:pt-0 dark:border-white/20 md:border-transparent md:dark:border-transparent">
             <form onSubmit={handleSubmit} className='stretch mx-2 flex flex-row gap-3 last:mb-2 md:mx-4 md:last:mb-6 lg:mx-auto lg:max-w-2xl xl:max-w-3xl'>
                 <div className="relative flex h-full flex-1 items-stretch md:flex-col">
-                    {messagesLength === 0 && !showSampleInput && <SampleInput  onClick={onSubmit}/>}
+                    {/* {messagesLength === 0 && !showSampleInput && <SampleInput  onClick={onSubmit}/>} */}
                     <div className="flex w-full items-center">
                         <div className={`flex w-full justify-between items-stretch dark:text-white rounded-[26px] bg-[#f4f4f4] dark:bg-[--main-surface-secondary]`}>
                             <div className="flex grow items-center">
@@ -114,7 +114,7 @@ const Input: React.FC<InputProps> = ({isActive, onSubmit, messagesLength, showSa
                     </div>
                 </div>
             </form>
-            <div className="relative px-2 py-2 text-center text-xs text-token-text-secondary md:px-[60px]">
+            <div className="relative px-2 py-2 text-center text-xs text-neutral-500">
                 <span>Consider checking important information.</span>
             </div>
         </div>

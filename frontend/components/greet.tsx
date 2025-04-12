@@ -3,13 +3,13 @@ import { IconEva } from './ui/icons';
 
 const Greet: React.FC = () => {
     return (
-        <div className="flex flex-col items-center">
+        <div className="flex flex-row items-center">
             <div className="relative">
-                <div className="h-12 w-12 md:h-16 md:w-16">
+                <div className="h-10 w-10 md:h-12 md:w-12">
                     <img src="/icon.svg" alt="Eva" />
                 </div>
             </div>
-            <div className="pt-6 text-2xl md:text-4xl font-medium">Eva the Assistant</div>
+            <div className="ml-3 text-3xl md:text-4xl font-medium">Eva AI</div>
         </div>
     );
 }
