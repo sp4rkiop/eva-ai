@@ -1,10 +1,7 @@
-﻿using genai.backend.api.Models;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.AspNetCore.SignalR;
 using genai.backend.api.Middlewares;
-using Microsoft.Extensions.Caching.Memory;
 
 namespace genai.backend.api.Hub
 {
@@ -12,11 +9,6 @@ namespace genai.backend.api.Hub
     [RateLimit(requestsPerMinute: 60)]
     public class ChatHub : Microsoft.AspNetCore.SignalR.Hub
     {
-        private readonly IDictionary<string, ChatHubConnection> _connection;
-        public ChatHub(IDictionary<string, ChatHubConnection> connection)
-        {
-            _connection = connection;
-        }
         public override async Task OnConnectedAsync()
         {
             await base.OnConnectedAsync();

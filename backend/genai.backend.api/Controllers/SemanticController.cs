@@ -1,25 +1,18 @@
-﻿using genai.backend.api.Services;
+using genai.backend.api.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace genai.backend.api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class SemanticController : Controller
+    public class SemanticController(SemanticService semanticService) : Controller
     {
-        private readonly SemanticService _semanticService;
-
-        public SemanticController(SemanticService semanticService)
-        {
-            _semanticService = semanticService;
-        }
         public class PostRequest
         {
             public required Guid modelId { get; set; }
             public required string userInput { get; set; }
-            public string? chatId { get; set; } // Nullable
+            public string? chatId { get; set; }
         }
 
         [HttpPost]
@@ -28,9 +21,9 @@ namespace genai.backend.api.Controllers
             try
             {
                 var userId = HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sid)?.Value;
-                if (userId != null && requestBody != null && !string.IsNullOrEmpty(requestBody.userInput))
+                if (userId != null && !string.IsNullOrEmpty(requestBody.userInput))
                 {
-                    var result = await _semanticService.semanticChatAsync(Guid.Parse(userId), 
+                    var result = await semanticService.SemanticChatAsync(Guid.Parse(userId), 
                         requestBody.modelId, requestBody.userInput, requestBody.chatId);
                     
                     if (!result.Success)

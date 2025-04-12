@@ -5,8 +5,6 @@ using genai.backend.api.Models;
 using genai.backend.api.Plugins;
 using genai.backend.api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using System.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +29,7 @@ builder.Services.AddAuthentication(x =>
     x.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration.GetValue<string>("Jwt:SecretKey"))),
+        IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(builder.Configuration.GetValue<string>("Jwt:SecretKey")!)),
         ValidateIssuer = false,
         ValidateAudience = false,
         ClockSkew = TimeSpan.Zero
@@ -81,14 +79,14 @@ builder.Services.AddSwaggerGen(options =>
                     Id = "Bearer"
                 }
             },
-            new string[] {}
+            []
         }
     });
 });
 
 
 // Register Cassandra session with DI container
-builder.Services.AddSingleton<Cassandra.ISession>(session);
+builder.Services.AddSingleton(session);
 builder.Services.AddMemoryCache();
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -113,8 +111,8 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(
         "AllowAll",
-        builder =>
-            builder
+        corsPolicyBuilder =>
+            corsPolicyBuilder
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials()

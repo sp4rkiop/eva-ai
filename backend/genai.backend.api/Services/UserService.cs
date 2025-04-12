@@ -1,37 +1,21 @@
-﻿using Cassandra;
-using genai.backend.api.Models;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.IdentityModel.Tokens;
-using System;
+﻿using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
 namespace genai.backend.api.Services
 {
-    public class UserService
+    public class UserService(IConfiguration configuration, Cassandra.ISession session)
     {
-        private readonly IConfiguration? _configuration;
-        private readonly Cassandra.ISession _session;
-        private readonly ResponseStream _responseStream;
-        private readonly IMemoryCache _cache;
-        public UserService(IConfiguration configuration, Cassandra.ISession session, ResponseStream responseStream, IMemoryCache cache)
-        {
-            _configuration = configuration;
-            _session = session;
-            _responseStream = responseStream;
-            _cache = cache;
-        }
+        private readonly IConfiguration? _configuration = configuration;
+
         public async Task<Object> GetCreateUser(string emailId, string? firstName, string? lastName, string partner)
         {
             // Attempt to fetch the user and their subscribed models in a single query
             var userSelectStatement = "SELECT userid, role FROM users WHERE email = ? AND partner = ? LIMIT 1";
-            var userPreparedStatement = _session.Prepare(userSelectStatement);
-            var user = await _session.ExecuteAsync(userPreparedStatement.Bind(emailId, partner)).ConfigureAwait(false);
+            var userPreparedStatement = await session.PrepareAsync(userSelectStatement);
+            var user = await session.ExecuteAsync(userPreparedStatement.Bind(emailId, partner)).ConfigureAwait(false);
             var userRow = user.FirstOrDefault();
 
             if (userRow == null)
@@ -40,26 +24,26 @@ namespace genai.backend.api.Services
                 var userId = Guid.NewGuid();
                 var defaultRole = "user";
                 var userInsertStatement = "INSERT INTO users (userid, role, firstname, lastname, email, partner) VALUES (?, ?, ?, ?, ?, ?) IF NOT EXISTS";
-                var userInsertPreparedStatement = _session.Prepare(userInsertStatement);
-                var resultSet = await _session.ExecuteAsync(userInsertPreparedStatement.Bind(userId, defaultRole, firstName, lastName, emailId, partner)).ConfigureAwait(false);
+                var userInsertPreparedStatement = await session.PrepareAsync(userInsertStatement);
+                var resultSet = await session.ExecuteAsync(userInsertPreparedStatement.Bind(userId, defaultRole, firstName, lastName, emailId, partner)).ConfigureAwait(false);
                 var appliedInfo = resultSet.FirstOrDefault();
 
                 if (appliedInfo != null && appliedInfo.GetValue<bool>("[applied]"))
                 {
                     // Create a default entry for UserSubscriptions
-                    var defaultModelId = _configuration.GetValue<Guid>("DefaultModelId");
+                    var defaultModelId = _configuration!.GetValue<Guid>("DefaultModelId");
                     var subscriptionInsertStatement = "INSERT INTO usersubscriptions (userid, modelid) VALUES (?, ?) IF NOT EXISTS";
-                    var subscriptionInsertPreparedStatement = _session.Prepare(subscriptionInsertStatement);
-                    await _session.ExecuteAsync(subscriptionInsertPreparedStatement.Bind(userId, defaultModelId)).ConfigureAwait(false);
+                    var subscriptionInsertPreparedStatement = await session.PrepareAsync(subscriptionInsertStatement);
+                    await session.ExecuteAsync(subscriptionInsertPreparedStatement.Bind(userId, defaultModelId)).ConfigureAwait(false);
 
                     return new { UserId = userId, Token = GenerateJwtToken(userId, defaultRole) };
                 }
                 else
                 {
                     // If the insert was not applied, it means the user was created by another request
-                    user = await _session.ExecuteAsync(userPreparedStatement.Bind(emailId, partner)).ConfigureAwait(false);
+                    user = await session.ExecuteAsync(userPreparedStatement.Bind(emailId, partner)).ConfigureAwait(false);
                     userRow = user.FirstOrDefault();
-                    return new { UserId = userRow.GetValue<Guid>("userid"), Token = GenerateJwtToken(userRow.GetValue<Guid>("userid"), userRow.GetValue<string>("role")) };
+                    return new { UserId = userRow!.GetValue<Guid>("userid"), Token = GenerateJwtToken(userRow.GetValue<Guid>("userid"), userRow.GetValue<string>("role")) };
                 }
             }
             else
@@ -71,14 +55,13 @@ namespace genai.backend.api.Services
         private string GenerateJwtToken(Guid userId, string role)
         {
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]);
+            var key = Encoding.UTF8.GetBytes(_configuration!["Jwt:SecretKey"]!);
             var tokenDescriptor = new SecurityTokenDescriptor
             {
-                Subject = new ClaimsIdentity(new Claim[]
-                {
+                Subject = new ClaimsIdentity([
                     new Claim(JwtRegisteredClaimNames.Sid, userId.ToString()),
                     new Claim(ClaimTypes.Role, role)
-                }),
+                ]),
                 Expires = DateTime.UtcNow.AddDays(1),
                 SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
             };
@@ -91,9 +74,9 @@ namespace genai.backend.api.Services
             {
                 // Prepare and execute the CQL query to fetch chat history
                 var chatSelectStatement = "SELECT chatid, chattitle, createdon FROM chathistory_by_visible WHERE visible = true AND userid = ?";
-                var preparedStatement = _session.Prepare(chatSelectStatement);
+                var preparedStatement = await session.PrepareAsync(chatSelectStatement);
                 var boundStatement = preparedStatement.Bind(userId);
-                var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
+                var resultSet = await session.ExecuteAsync(boundStatement).ConfigureAwait(false);
                 // Convert the result set to a list of chat titles
                 var chatTitles = new List<dynamic>();
                 foreach (var row in resultSet)
@@ -124,9 +107,9 @@ namespace genai.backend.api.Services
         {
             // First query to get model IDs from usersubscriptions
             var modelSelectStatement = "SELECT modelid FROM usersubscriptions WHERE userid = ?";
-            var preparedStatement = _session.Prepare(modelSelectStatement);
+            var preparedStatement = await session.PrepareAsync(modelSelectStatement);
             var boundStatement = preparedStatement.Bind(userId);
-            var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
+            var resultSet = await session.ExecuteAsync(boundStatement).ConfigureAwait(false);
 
             var modelIds = resultSet.Select(row => row.GetValue<Guid>("modelid")).ToList();
 
@@ -137,13 +120,13 @@ namespace genai.backend.api.Services
                 var deploymentNameSelectStatement = $"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true";
 
                 // Prepare the dynamically constructed query
-                var deploymentNamePreparedStatement = _session.Prepare(deploymentNameSelectStatement);
+                var deploymentNamePreparedStatement = await session.PrepareAsync(deploymentNameSelectStatement);
 
                 // Bind each individual modelId as a separate parameter
                 var deploymentNameBoundStatement = deploymentNamePreparedStatement.Bind(modelIds.Cast<object>().ToArray());
 
                 // Execute the query
-                var deploymentNameResultSet = await _session.ExecuteAsync(deploymentNameBoundStatement).ConfigureAwait(false);
+                var deploymentNameResultSet = await session.ExecuteAsync(deploymentNameBoundStatement).ConfigureAwait(false);
 
                 // Process the result and return the list of models
                 var models = deploymentNameResultSet.Select(row => new
@@ -161,9 +144,9 @@ namespace genai.backend.api.Services
         public async Task<bool> RenameConversation(Guid userId, Guid chatId, string newTitle)
         {
             var chatSelectStatement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ? LIMIT 1";
-            var preparedStatement = _session.Prepare(chatSelectStatement);
+            var preparedStatement = await session.PrepareAsync(chatSelectStatement);
             var boundStatement = preparedStatement.Bind(userId, chatId);
-            var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
+            var resultSet = await session.ExecuteAsync(boundStatement).ConfigureAwait(false);
 
             if (resultSet.FirstOrDefault() == null)
             {
@@ -171,9 +154,9 @@ namespace genai.backend.api.Services
             }
 
             var chatUpdateStatement = "UPDATE chathistory SET chattitle = ? WHERE userid = ? AND chatid = ?";
-            var updatePreparedStatement = _session.Prepare(chatUpdateStatement);
+            var updatePreparedStatement = await session.PrepareAsync(chatUpdateStatement);
             var updateBoundStatement = updatePreparedStatement.Bind(newTitle, userId, chatId);
-            await _session.ExecuteAsync(updateBoundStatement).ConfigureAwait(false);
+            await session.ExecuteAsync(updateBoundStatement).ConfigureAwait(false);
 
             return true;
         }
@@ -181,9 +164,9 @@ namespace genai.backend.api.Services
         public async Task<bool> DeleteConversation(Guid userId, Guid chatId)
         {
             var chatSelectStatement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = ? AND chatid = ? LIMIT 1";
-            var preparedStatement = _session.Prepare(chatSelectStatement);
+            var preparedStatement = await session.PrepareAsync(chatSelectStatement);
             var boundStatement = preparedStatement.Bind(userId, chatId);
-            var resultSet = await _session.ExecuteAsync(boundStatement).ConfigureAwait(false);
+            var resultSet = await session.ExecuteAsync(boundStatement).ConfigureAwait(false);
 
             if (resultSet.FirstOrDefault() == null)
             {
@@ -191,9 +174,9 @@ namespace genai.backend.api.Services
             }
 
             var chatDeleteStatement = "UPDATE chathistory SET visible = false WHERE userid = ? AND chatid = ?";
-            var deletePreparedStatement = _session.Prepare(chatDeleteStatement);
+            var deletePreparedStatement = await session.PrepareAsync(chatDeleteStatement);
             var deleteBoundStatement = deletePreparedStatement.Bind(userId, chatId);
-            await _session.ExecuteAsync(deleteBoundStatement).ConfigureAwait(false);
+            await session.ExecuteAsync(deleteBoundStatement).ConfigureAwait(false);
 
             return true;
         }

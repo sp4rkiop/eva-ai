@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using genai.backend.api.Services;
-using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Authorization;
 using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using genai.backend.api.Middlewares;
 
 namespace genai.backend.api.Controllers
@@ -11,33 +9,22 @@ namespace genai.backend.api.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [RateLimit(requestsPerMinute: 60)]
-    public class UsersController : ControllerBase
+    public class UsersController(UserService userService, SemanticService semanticService) : ControllerBase
     {
-        private readonly UserService _userService;
-        private readonly SemanticService _semanticService;
-
-
-        public UsersController(UserService userService, SemanticService semanticService)
-        {
-            _userService = userService;
-            _semanticService = semanticService;
-
-        }
-
         [HttpPost("UserId")]
         [AllowAnonymous]
         public async Task<IActionResult> GetOrCreateUser([FromBody] CreateUserRequest request)
         {
-            if (request == null || string.IsNullOrEmpty(request.EmailId))
+            if (string.IsNullOrEmpty(request.EmailId))
             {
                 return BadRequest("EmailId is required.");
             }
 
             try
             {
-                dynamic uId_token = await _userService.GetCreateUser(request.EmailId.ToLower(), request.FirstName, request.LastName, request.Partner);
-                HttpContext.Response.Headers.Add("Authorization", uId_token.Token);
-                return Ok(uId_token.UserId.ToString());
+                dynamic uIdToken = await userService.GetCreateUser(request.EmailId.ToLower(), request.FirstName, request.LastName, request.Partner);
+                HttpContext.Response.Headers.Add("Authorization", uIdToken.Token);
+                return Ok(uIdToken.UserId.ToString());
             }
             catch (Exception ex) {
                 return BadRequest(ex.Message);
@@ -51,7 +38,7 @@ namespace genai.backend.api.Controllers
                 var userId = HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sid)?.Value;
                 if (userId!=null)
                 {
-                    var conversations = await _userService.Conversations(Guid.Parse(userId));
+                    var conversations = await userService.Conversations(Guid.Parse(userId));
                     return Ok(conversations);
                 }
                 return BadRequest();
@@ -69,7 +56,7 @@ namespace genai.backend.api.Controllers
                 var userId = HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sid)?.Value;
                 if (userId != null)
                 {
-                    var models = await _userService.GetSubscribedModels(userId: Guid.Parse(userId));
+                    var models = await userService.GetSubscribedModels(userId: Guid.Parse(userId));
                     return Ok(models);
                 }
                 return BadRequest();
@@ -86,7 +73,7 @@ namespace genai.backend.api.Controllers
             var userId = HttpContext.User.FindFirst(JwtRegisteredClaimNames.Sid)?.Value;
             if (userId != null)
             {
-                var chatJson = await _semanticService.GetConversation(Guid.Parse(userId), chatId);
+                var chatJson = await semanticService.GetConversation(Guid.Parse(userId), chatId);
                 return Ok(chatJson);
             }
             return BadRequest();
@@ -100,13 +87,11 @@ namespace genai.backend.api.Controllers
                 if (string.IsNullOrEmpty(title))
                 {
                     // If the title is null or empty, check if delete request is present
-                    if (deleteRequest != null && deleteRequest.Delete)
+                    if (deleteRequest is { Delete: true })
                     {
-                        var result = await _userService.DeleteConversation(Guid.Parse(userId), chatId);
+                        var result = await userService.DeleteConversation(Guid.Parse(userId), chatId);
                         if (result)
-                        {
                             return NoContent(); // Successfully deleted
-                        }
                         return NotFound("Chat title not found.");
                     }
                     else
@@ -117,7 +102,7 @@ namespace genai.backend.api.Controllers
                 else
                 {
                     // If the title is provided, rename the chat title
-                    var result = await _userService.RenameConversation(Guid.Parse(userId), chatId, title);
+                    var result = await userService.RenameConversation(Guid.Parse(userId), chatId, title);
                     if (result)
                     {
                         return NoContent(); // Successfully renamed
@@ -135,10 +120,10 @@ namespace genai.backend.api.Controllers
 
         public class CreateUserRequest
         {
-            public string EmailId { get; set; }
+            public required string EmailId { get; set; }
             public string? FirstName { get; set; }
             public string? LastName { get; set; }
-            public string Partner { get; set; }
+            public required string Partner { get; set; }
         }
 
     }
