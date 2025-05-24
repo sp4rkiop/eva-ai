@@ -1,0 +1,14 @@
+curl_cffi
+beautifulsoup4
+fastapi
+fuzzywuzzy
+langchain
+langchain-openai
+langchain-community
+Levenshtein
+pydantic-settings
+pydantic[email]
+pyjwt
+scylla-driver
+uvicorn[standard]
+websockets
