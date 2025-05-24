@@ -1,4 +1,4 @@
-import uuid, pickle, logging
+import uuid, pickle, logging, re, asyncio
 from pydantic import SecretStr
 from core.database import CassandraDatabase
 from core.config import settings
@@ -85,9 +85,8 @@ class ChatService:
         # Store the new branch
         self.store[new_branch] = new_history
 
-    async def process_input(self, socketId: str, userInput: str, branch: str):
+    async def process_input(self, userId: uuid.UUID, chatId: str, userInput: str, branch: str):
         chat_history = self.get_chat_history_by_branch(branch).messages[-4:]
-        print(chat_history)
         prompt = ChatPromptTemplate.from_messages([
             ("system", settings.SYSTEM_PROMPT),
             *chat_history,
@@ -111,18 +110,18 @@ class ChatService:
         )
         async for chunk in chain_with_history.astream({"input": userInput},
                                                     config={"configurable": {"branch": branch}}):
-            print(chunk.content, end="", flush=True)
             await ws_manager.send_to_user(
-                sid=socketId, 
+                sid=userId, 
                 message_type="StreamMessage", 
-                data={"chat_id": socketId, "content": chunk.content}
+                data={"chat_id": chatId, "content": chunk.content}
             )
+            await asyncio.sleep(0.015)  # 15ms delay
 
     async def lanchain_chat(self, userId: uuid.UUID, userInput: str, chatId: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[str]:
         try:
             if not chatId:
                 chatId = uuid.uuid4()
-                await self.process_input(str(userId), userInput, branch)
+                await self.process_input(userId, str(userId), userInput, branch)
                 token_uses = 0
                 chat_title = await self.generate_chat_title(userInput)
                 last_message = self.store[branch].messages[-1]
@@ -135,7 +134,7 @@ class ChatService:
                     if chat_saved and chat_saved.applied:
                         logger.info(f"Chat saved with chatId: {chatId} for user: {userId}")
                     await ws_manager.send_to_user(
-                        sid=str(userId), 
+                        sid=userId, 
                         message_type="EndStream", 
                         data=""
                     )
@@ -144,7 +143,7 @@ class ChatService:
                 chat_history_data = await self.user_service.get_single_conversation(userId, chatId)
                 self.store = chat_history_data['conversation']
                 token_used = chat_history_data['token_consumed']
-                await self.process_input(str(chatId), userInput, branch)
+                await self.process_input(userId, str(chatId), userInput, branch)
                 last_message = self.store[branch].messages[-1]
                 if hasattr(last_message, 'usage_metadata'):
                     token_used += last_message.usage_metadata.get('total_tokens', 0)
@@ -154,23 +153,23 @@ class ChatService:
                     if chat_saved and chat_saved.applied:
                         logger.info(f"Chat updated with chatId: {chatId} for user: {userId}")
                     await ws_manager.send_to_user(
-                        sid=str(chatId), 
+                        sid=userId, 
                         message_type="EndStream", 
                         data=""
                     )
         except Exception as e:
             logger.error(f"Error processing chat: {e}")
             await ws_manager.send_to_user(
-                sid=str(chatId if chatId else userId), 
+                sid=userId, 
                 message_type="StreamMessage", 
-                data="Something went wrong, please wait for a while."
+                data={"chat_id": str(chatId if chatId else userId), "content": "Something went wrong, please wait for a while."}
             )
             await ws_manager.send_to_user(
-                sid=str(chatId if chatId else userId), 
+                sid=userId,
                 message_type="EndStream", 
                 data=""
             )
-            return None
+            raise Exception("Something went wrong, please wait for a while.")
 
     async def generate_chat_title(self, userInput: str) -> Dict[str, Any]:
         """
@@ -197,16 +196,21 @@ class ChatService:
                     (
                         "system",
                         "You are a chatbot specialized in generating concise titles. "
-                        "Given a message, you will respond with a title in no more than 5 word which should capture the essence of message.",
+                        "Given a message, you will respond with a title in no more than 5 word which should capture the essence of message. "
+                        "Response can contain emojis and special characters if needed. Do not wrap the title in quotes.",
                     ),
                     ("human", "{input}"),
                 ]
             )
             chain = prompt | self.llm
             response = await chain.ainvoke({"input": userInput})
+            raw_content = response.content
+            if isinstance(raw_content, str):
+                clear_output = re.sub(r'^"(.*)"$', r'\1', raw_content)
+            else:
+                clear_output = raw_content
             token_uses = response.response_metadata['token_usage']['total_tokens'] if response.response_metadata else 0
-            logger.info(f"Generated chat title: {response.content}, tokens used: {token_uses}")
-            return {"content": response.content, "token_uses": token_uses}
+            return {"content": clear_output, "token_uses": token_uses}
         except Exception as e:
             logger.error(f"Failed to generate title with error: {str(e)}")
             return {"content": "Failed to generate title", "token_uses": 0}

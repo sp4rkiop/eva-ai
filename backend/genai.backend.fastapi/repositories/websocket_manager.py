@@ -1,16 +1,16 @@
 from fastapi import WebSocket
 from typing import Any, Dict, Set
-import logging
+import logging, uuid
 
 # Setup logging
 logger = logging.getLogger(__name__)
 
 class WebSocketManager:
     def __init__(self):
-        self.users: Dict[str, Set[WebSocket]] = {}
-        self.connections: Dict[str, str] = {}  # Map connection_id to sid
+        self.users: Dict[uuid.UUID, Set[WebSocket]] = {}
+        self.connections: Dict[str, uuid.UUID] = {}  # Map connection_id to sid
 
-    async def connect(self, websocket: WebSocket, sid: str):
+    async def connect(self, websocket: WebSocket, sid: uuid.UUID):
         await websocket.accept()
         if sid not in self.users:
             self.users[sid] = set()
@@ -37,7 +37,7 @@ class WebSocketManager:
         else:
             logger.warning(f"Connection {connection_id} disconnected without a valid SID")
 
-    async def send_to_user(self, sid: str, message_type: str, data: Any):
+    async def send_to_user(self, sid: uuid.UUID, message_type: str, data: Any):
         for conn in self.users.get(sid, set()):
             try:
                 await conn.send_json({"type": message_type, "data": data})

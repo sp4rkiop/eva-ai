@@ -1,3 +1,4 @@
+import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
@@ -38,7 +39,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         payload = await authenticate_websocket(websocket)
         if payload:
-            sid = payload["sid"]
+            sid = uuid.UUID(payload["sid"])
             await ws_manager.connect(websocket, sid)
             try:
                 while True:

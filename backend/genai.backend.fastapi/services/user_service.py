@@ -111,7 +111,7 @@ class UserService:
                 # Serialize and return the chat titles if any are found
                 if chat_titles:
                     return chat_titles
-                raise Exception("Unable to find conversations")
+                return []
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get conversations: {str(ex)}")
@@ -209,7 +209,6 @@ class UserService:
                     is_subscribed = result is not None
                     if is_subscribed:
                         CacheRepository.set(cache_key, is_subscribed, 60)
-                    logger.info(f"Model {modelId} is {'subscribed' if is_subscribed else 'not subscribed'} for user {userId}")
                     return is_subscribed
         except Exception as e:
             logger.error(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")

@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Path, Query
+from fastapi import APIRouter, HTTPException, Depends, Path, Query, Response
 from models.auth_model import AuthRequest
 from models.request_model import DeleteRequest
 from services.user_service import UserService
@@ -16,6 +16,18 @@ async def login_signup(
     user_service: UserService = Depends(get_user_service)):
     try:
         result = await user_service.get_create_user(signup_request.email, signup_request.first_name, signup_request.last_name, signup_request.partner)
+        response = Response(content=str(result["userId"]), media_type="text/plain")
+        response.headers["Authorization"] = f"{result["token"]}"
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/models")
+async def get_all_models(
+    payload: dict = Depends(get_current_user), 
+    user_service: UserService = Depends(get_user_service)):
+    try:    
+        result = await user_service.get_subscribed_models(uuid.UUID(payload["sid"]))
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -52,10 +64,15 @@ async def rename_or_delete_conversation(
     try:    
         if title:
             result = await user_service.rename_conversation(uuid.UUID(payload["sid"]), uuid.UUID(chat_id), title)
-            return result
+            if result:
+                response = Response(status_code=204)
+                return response
         elif delete_request:
             result = await user_service.delete_conversation(uuid.UUID(payload["sid"]), uuid.UUID(chat_id))
-            return result
+            if result:
+                response = Response(status_code=204)
+                return response
+        return Response(status_code=409)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
