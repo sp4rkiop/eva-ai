@@ -12,3 +12,4 @@ pyjwt
 scylla-driver
 uvicorn[standard]
 websockets
+apscheduler

@@ -3,10 +3,12 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.database import CassandraDatabase
-from core.session_manager import CurlCFFISession
+from core.curl_cffi_session_manager import CurlCFFISession
 from contextlib import asynccontextmanager
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from repositories.websocket_manager import ws_manager
 from dependencies.auth_dependencies import get_current_user, authenticate_websocket
+from services.management_service import ModelData
 from api.v1.endpoints import user, chat
 
 @asynccontextmanager
@@ -14,10 +16,18 @@ async def lifespan(app: FastAPI):
     # --- startup ---
     CassandraDatabase.initialize()
     CurlCFFISession.initialize()
+    await ModelData.get_all_models()
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(scheduled_data_fetch,"interval",seconds = 86400) # 86400 seconds = every 24 hours
+    scheduler.start()
     yield
     # --- shutdown ---
     CassandraDatabase.close_all_connections()
     CurlCFFISession.close_session()
+    scheduler.shutdown()
+
+async def scheduled_data_fetch():
+    await ModelData.get_all_models()
 
 app = FastAPI(
     title="Eva", 

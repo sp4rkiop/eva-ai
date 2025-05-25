@@ -15,6 +15,8 @@ class CacheRepository:
 
     @staticmethod
     def set(key: str, value: Any, expiry: int):
+        if key in CacheRepository._cache:
+            CacheRepository.delete(key)
         CacheRepository._cache[key] = {
             'value': value,
             'expiry': time.time() + expiry

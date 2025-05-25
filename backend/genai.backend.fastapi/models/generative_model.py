@@ -1,7 +1,6 @@
 import uuid
 from pydantic import BaseModel
 
-
 class GenerativeModel(BaseModel):
     deployment_id: uuid.UUID
     deployment_name: str

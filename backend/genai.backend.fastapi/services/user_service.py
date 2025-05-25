@@ -179,7 +179,7 @@ class UserService:
                 
                 # Create query with placeholders for the IN clause
                 placeholders = ','.join(['%s'] * len(model_ids))
-                deployment_name_select_statement = f"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true"
+                deployment_name_select_statement = f"SELECT deploymentid, modelname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true"
 
                 # Execute the query with model_ids as parameters
                 deployment_name_result_set = session.execute(deployment_name_select_statement, model_ids)
@@ -188,7 +188,7 @@ class UserService:
                 return [
                     {
                         "id": row.deploymentid,
-                        "name": row.deploymentname
+                        "name": row.modelname
                     }
                     for row in deployment_name_result_set
                 ]
@@ -225,6 +225,7 @@ class UserService:
             is_subscribed = await asyncio.to_thread(_sync_check)
             if is_subscribed:
                 CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
+                logger.info(f"Model {modelId} is subscribed for user {userId}")
             return is_subscribed
         except Exception as e:
             logger.error(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")
