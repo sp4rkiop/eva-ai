@@ -72,7 +72,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             partner: partner,
         };
     
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -120,7 +120,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
 
             setAssistantTyping(true);
             
-            var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
+            var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/ai_request`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -157,10 +157,21 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                     return;
                 }
             }
-            const newChatId = await response.text();
-            if(newChatId!=null && newChatId.length!= 0) {
-                setCurrentChatId(newChatId);
-                window.history.pushState({}, '', `/c/${newChatId}`);
+            const responseJson = await response.json();
+            if (responseJson.success) {
+              const newChatId = responseJson.chat_id;
+              if(newChatId!=null && newChatId.length!= 0) {
+                  setCurrentChatId(newChatId);
+                  window.history.pushState({}, '', `/c/${newChatId}`);
+              }
+            } else {
+              const errorMessage = responseJson.error_message;
+              toast({
+                variant: "destructive",
+                title: "Uh oh! Something went wrong.",
+                description: errorMessage,
+                duration: 1500
+              });
             }
         } catch (error) {
           toast({
@@ -215,25 +226,28 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     if (currentChatId && messages.length === 0) {
       try{
         setloadingConversaion(true);
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${currentChatId}`, {
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${currentChatId}`, {
           method: "GET",
           headers: {
             "Authorization": `Bearer ${back_auth}`
           },
-        }
-        )
+        })
           .then((response) => 
             response.status === 401 ? getuId_token() : response.json())
           .then((data) => {
-            if (data && data.length > 0) {
-              const newMessages: Message[] = data
-                .filter((chat: any) => {
+            const rawMessages = data?.conversation?.main?.messages || [];
+            if (rawMessages.length > 0) {
+              const newMessages: Message[] = rawMessages
+                .filter((message: any) => {
                   // Check for valid roles and non-empty messages
-                  return (chat.Role.Label === "assistant" || chat.Role.Label === "user") && chat.Items[0].Text.trim() !== "";
+                  return (
+                    (message.type === "human" || message.type === "AIMessageChunk") &&
+                    message.content?.trim() !== ""
+                  );
                 })
-                .map((chat: any) => ({
-                  role: chat.Role.Label,
-                  text: chat.Items[0].Text,
+                .map((message: any) => ({
+                  role: message.type === "human" ? "user" : "assistant",
+                  text: message.content,
                 }));
               setMessages(newMessages);
               setTimeout(() => scrollToBottom(true), 50);

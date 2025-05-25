@@ -69,7 +69,7 @@ export default function IndexPage() {
       };
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`,
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -35,7 +35,7 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
   useEffect(() => {
     const getModels = async (newToken?: string | null): Promise<void> => {
       try{
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/models`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/models`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

@@ -1,22 +1,14 @@
-import * as signalR from '@microsoft/signalr';
 import { BehaviorSubject, Subject } from 'rxjs';
 
 export class ChatService {
   private static instance: ChatService;
-  private connection: signalR.HubConnection = new signalR.HubConnectionBuilder()
-  .withUrl(process.env.NEXT_PUBLIC_BACKEND_API_URL + "/hub", {
-    accessTokenFactory: () => this.authToken$.value
-  })
-  .withAutomaticReconnect()
-  .withKeepAliveInterval(5000)
-  .configureLogging(signalR.LogLevel.None)
-  .build();
+  private socket: WebSocket | null = null;
 
   public msgs$ = new BehaviorSubject<any>([]);
   public msgs: { [chatId: string]: string[] } = {};
   public endStream$ = new Subject<void>();
   public selectedModelId$ = new BehaviorSubject<number>(1);
-  public HubConnectionState$ = new BehaviorSubject<string>('');
+  public HubConnectionState$ = new BehaviorSubject<string>('Disconnected');
   public userId$ = new BehaviorSubject<string>('');
   public authToken$ = new BehaviorSubject<string>('');
 
@@ -28,67 +20,89 @@ export class ChatService {
         this.reconnect();
       }
     });
-
-    // Inside the ChatService class, update the StreamMessage event handler
-    this.connection.on("StreamMessage", (message: string) => {
-      try {
-        const parsedMessage = JSON.parse(message);
-        const chatId = parsedMessage.ChatId;
-        const partialContent = parsedMessage.PartialContent;
-
-        if (!this.msgs[chatId]) {
-          this.msgs[chatId] = [];
-        }
-        // Add the partialContent to the chatId array
-        this.msgs[chatId].push(partialContent);
-        this.msgs$.next(this.msgs);
-      } catch (error) {
-        console.error("Error parsing StreamMessage:", error);
-      }
-    });
-    this.connection.on("EndStream", () => {
-      setTimeout(() => {
-        this.msgs = {};
-        this.msgs$.next(this.msgs);
-        this.endStream$.next();
-      }, 500); // 1000 milliseconds = 1 seconds
-    });
-}
-public static getInstance(): ChatService {
-  if (!ChatService.instance) {
-      ChatService.instance = new ChatService();
   }
-  return ChatService.instance;
-}
-public isConnectionConnected(): boolean {
-  return this.connection.state === signalR.HubConnectionState.Connected;
-}
+  public static getInstance(): ChatService {
+    if (!ChatService.instance) {
+        ChatService.instance = new ChatService();
+    }
+    return ChatService.instance;
+  }
+  private getWebSocketUrl(): string {
+    const token = this.authToken$.value;
+    const baseUrl = process.env.NEXT_PUBLIC_BACKEND_API_URL || '';
+    const wsUrl = baseUrl.replace(/^http(s)?/, 'ws$1');
+    return `${wsUrl}/hub?token=${token}`;
+  }
+  public start(): void {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) return;
 
-//start connection
-public async start() {
-  if (this.connection.state === signalR.HubConnectionState.Disconnected && this.authToken$.value!=null) {
-    try {
-      await this.connection.start();
-      //console.log("SignalR Connected.");
-      this.HubConnectionState$.next("Connected");
-    } catch (err) {
-      console.error("Error starting SignalR connection:", err);
+      const wsUrl = this.getWebSocketUrl();
+      this.socket = new WebSocket(wsUrl);
+
+      this.socket.onopen = () => {
+        this.HubConnectionState$.next('Connected');
+        console.log('[WebSocket] Connected');
+      };
+
+      this.socket.onclose = () => {
+        this.HubConnectionState$.next('Disconnected');
+        console.log('[WebSocket] Disconnected');
+      };
+
+      this.socket.onerror = (err) => {
+        console.error('[WebSocket] Error:', err);
+      };
+
+      this.socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          const type = message.type;
+          const data = message.data;
+
+          if (type === "StreamMessage") {
+            const chatId = data.chat_id;
+            const partialContent = data.content;
+
+            if (!this.msgs[chatId]) {
+              this.msgs[chatId] = [];
+            }
+
+            this.msgs[chatId].push(partialContent);
+            this.msgs$.next(this.msgs);
+
+          } else if (type === "EndStream") {
+            setTimeout(() => {
+              this.msgs = {};
+              this.msgs$.next(this.msgs);
+              this.endStream$.next();
+            }, 500);
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+      };
+    }
+  public stop(): void {
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+      this.HubConnectionState$.next('Disconnected');
     }
   }
-}
-//reconnect
-public async reconnect(){
-  if (this.connection.state === signalR.HubConnectionState.Connected) {
-    await this.stop();
-  }
-    await this.start();
-}
 
-//stop connection
-public async stop(){
-    this.connection.stop();
-    this.HubConnectionState$.next("Disconnected"); // Set the HubConnectionState to "Disconnected";
-    // console.log("SignalR Disconnected.");
-}
+  public reconnect(): void {
+    this.stop();
+    this.start();
+  }
+
+  public isConnectionConnected(): boolean {
+    return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  public send(data: any): void {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(data));
+    }
+  }
 
 }

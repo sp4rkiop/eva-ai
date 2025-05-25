@@ -12,16 +12,16 @@ export const authOptions: NextAuthOptions = {
         let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
-          emailId: profile.email,
-          firstName: profile.given_name ?? '',
-          lastName: profile.family_name ?? '',
+          email: profile.email,
+          first_name: profile.given_name ?? '',
+          last_name: profile.family_name ?? '',
           partner: `google-${profile.sub}`,
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
         try {
           // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),
@@ -55,21 +55,21 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GITHUB_SECRET as string,
       async profile(profile: GithubProfile) {
         // Extract first name and last name from the name field
-        const [firstName = "", lastName = ""] = (profile.name ?? "").split(" ");
+        const [first_name = "", last_name = ""] = (profile.name ?? "").split(" ");
         let back_auth = "";
         let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
-          emailId: profile.email,
-          firstName,
-          lastName,
+          email: profile.email,
+          first_name,
+          last_name,
           partner: `github-${profile.id}`,
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
         try {
           // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/UserId`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),

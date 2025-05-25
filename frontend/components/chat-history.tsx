@@ -96,7 +96,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   };
 
   const handleRename = (chatId: string, newTitle: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${chatId}/?title=${newTitle}`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}?title=${newTitle}`, {
       method: "PATCH",
       headers: {
         "Authorization": `Bearer ${back_auth}`
@@ -130,12 +130,19 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             chat.title.toLowerCase().includes(searchText.toLowerCase())
           ));
         }
-    }
+    } else {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "There was a problem renaming the chat. Code: " + res.status,
+          duration: 1500
+        });
+      }
       })
   };
   
   const handleDelete = (chatId: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversation/${chatId}`, {
+    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -230,7 +237,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   useEffect(() => {
     const getConversations = async (newToken?: string | null): Promise<void> => {
       try{
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Users/conversations`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
