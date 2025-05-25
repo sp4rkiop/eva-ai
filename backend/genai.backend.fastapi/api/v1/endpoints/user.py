@@ -15,7 +15,12 @@ async def login_signup(
     signup_request: AuthRequest, 
     user_service: UserService = Depends(get_user_service)):
     try:
-        result = await user_service.get_create_user(signup_request.email, signup_request.first_name, signup_request.last_name, signup_request.partner)
+        result = await user_service.get_create_user(
+            signup_request.email, 
+            signup_request.first_name, 
+            signup_request.last_name, 
+            signup_request.partner
+        )
         response = Response(content=str(result["userId"]), media_type="text/plain")
         response.headers["Authorization"] = f"{result["token"]}"
         return response
@@ -50,6 +55,8 @@ async def get_single_conversation(
     try:    
         result = await user_service.get_single_conversation(uuid.UUID(payload["sid"]), uuid.UUID(chat_id))
         return result
+    except HTTPException as http_exc:
+        raise http_exc
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -65,24 +72,11 @@ async def rename_or_delete_conversation(
         if title:
             result = await user_service.rename_conversation(uuid.UUID(payload["sid"]), uuid.UUID(chat_id), title)
             if result:
-                response = Response(status_code=204)
-                return response
+                return Response(status_code=204)
         elif delete_request:
             result = await user_service.delete_conversation(uuid.UUID(payload["sid"]), uuid.UUID(chat_id))
             if result:
-                response = Response(status_code=204)
-                return response
+                return Response(status_code=204)
         return Response(status_code=409)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# @router.post("/ws_check")
-# async def ws_check(message: str):
-#     try:
-#         await ws_manager.send_to_user(
-#             sid="77e40363-2a0e-467f-b9e0-7631bbba44df", 
-#             message_type="EndStream", 
-#             data="nice"
-#         )
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))

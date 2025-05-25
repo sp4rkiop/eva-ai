@@ -56,11 +56,31 @@ class ChatService:
     async def chat_shield(self, userId: uuid.UUID, modelId: uuid.UUID, userInput: str, chatId: Optional[uuid.UUID] = None) -> ChatResponse:
         try:
             if not await self.user_service.is_model_subscribed(userId, modelId):
+                await ws_manager.send_to_user(
+                    sid=userId, 
+                    message_type="StreamMessage", 
+                    data={"chat_id": str(chatId if chatId else userId), "content": "You are not subscribed to this model"}
+                )
+                await ws_manager.send_to_user(
+                    sid=userId,
+                    message_type="EndStream", 
+                    data=""
+                )
                 return ChatResponse(success=False, error_message="Model is not subscribed")
             else:
                 chat_id = await self.lanchain_chat(userId, userInput, chatId)
                 return ChatResponse(success=True, chat_id=chat_id)
         except Exception as e:
+            await ws_manager.send_to_user(
+                sid=userId, 
+                message_type="StreamMessage", 
+                data={"chat_id": str(chatId if chatId else userId), "content": f"Something went wrong, please wait for a while. Error: {str(e)}"}
+            )
+            await ws_manager.send_to_user(
+                sid=userId,
+                message_type="EndStream", 
+                data=""
+            )
             return ChatResponse(success=False, error_message= "Server handling error: " + str(e))
         
     def get_chat_history_by_branch(self, branch: str) -> BaseChatMessageHistory:
@@ -128,16 +148,19 @@ class ChatService:
                 if hasattr(last_message, 'usage_metadata'):
                     token_uses = last_message.usage_metadata.get('total_tokens', 0)
                 total_tokens = chat_title['token_uses'] + token_uses
-                with CassandraDatabase.get_session() as session:
-                    chat_insert_statement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption, visible) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                    chat_saved = session.execute(chat_insert_statement, (userId, chatId, chat_title['content'], pickle.dumps(self.store), datetime.now(timezone.utc), total_tokens, True))
-                    if chat_saved and chat_saved.applied:
-                        logger.info(f"Chat saved with chatId: {chatId} for user: {userId}")
-                    await ws_manager.send_to_user(
-                        sid=userId, 
-                        message_type="EndStream", 
-                        data=""
-                    )
+                chat_blob = pickle.dumps(self.store)
+                def _save_new_chat():
+                    with CassandraDatabase.get_session() as session:
+                        chat_insert_statement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption, visible) VALUES (%s, %s, %s, %s, %s, %s, %s)"
+                        return session.execute(chat_insert_statement, (userId, chatId, chat_title['content'], chat_blob, datetime.now(timezone.utc), total_tokens, True))
+                chat_saved = await asyncio.to_thread(_save_new_chat)
+                if chat_saved and getattr(chat_saved[0], 'applied', True):
+                    logger.info(f"Chat saved with chatId: {chatId} for user: {userId}")
+                await ws_manager.send_to_user(
+                    sid=userId, 
+                    message_type="EndStream", 
+                    data=""
+                )
                 return str(chatId)
             else:
                 chat_history_data = await self.user_service.get_single_conversation(userId, chatId)
@@ -147,28 +170,22 @@ class ChatService:
                 last_message = self.store[branch].messages[-1]
                 if hasattr(last_message, 'usage_metadata'):
                     token_used += last_message.usage_metadata.get('total_tokens', 0)
-                with CassandraDatabase.get_session() as session:
-                    chat_update_statement = "UPDATE chathistory SET chathistoryjson = %s, createdon = %s, nettokenconsumption = %s WHERE userid = %s AND chatid = %s"
-                    chat_saved = session.execute(chat_update_statement, (pickle.dumps(self.store), datetime.now(timezone.utc), token_used, userId, chatId))
-                    if chat_saved and chat_saved.applied:
-                        logger.info(f"Chat updated with chatId: {chatId} for user: {userId}")
-                    await ws_manager.send_to_user(
-                        sid=userId, 
-                        message_type="EndStream", 
-                        data=""
-                    )
+                updated_blob = pickle.dumps(self.store)
+
+                def _update_existing_chat():
+                    with CassandraDatabase.get_session() as session:
+                        chat_update_statement = "UPDATE chathistory SET chathistoryjson = %s, createdon = %s, nettokenconsumption = %s WHERE userid = %s AND chatid = %s"
+                        return session.execute(chat_update_statement, (pickle.dumps(self.store), datetime.now(timezone.utc), token_used, userId, chatId))
+                chat_saved = await asyncio.to_thread(_update_existing_chat)
+                if chat_saved and getattr(chat_saved[0], 'applied', True):
+                    logger.info(f"Chat updated with chatId: {chatId} for user: {userId}")
+                await ws_manager.send_to_user(
+                    sid=userId, 
+                    message_type="EndStream", 
+                    data=""
+                )
         except Exception as e:
             logger.error(f"Error processing chat: {e}")
-            await ws_manager.send_to_user(
-                sid=userId, 
-                message_type="StreamMessage", 
-                data={"chat_id": str(chatId if chatId else userId), "content": "Something went wrong, please wait for a while."}
-            )
-            await ws_manager.send_to_user(
-                sid=userId,
-                message_type="EndStream", 
-                data=""
-            )
             raise Exception("Something went wrong, please wait for a while.")
 
     async def generate_chat_title(self, userInput: str) -> Dict[str, Any]:

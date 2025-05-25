@@ -1,4 +1,5 @@
-import uuid, jwt, logging, pickle
+from fastapi import HTTPException
+import uuid, jwt, logging, pickle, asyncio
 from pydantic import EmailStr
 from core.database import CassandraDatabase
 from core.config import settings
@@ -28,9 +29,8 @@ class UserService:
             Dictionary containing user ID and JWT token
         """
         logger.info(f"Getting or creating user for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-        try:
+        def _sync_db_work():
             with CassandraDatabase().get_session() as session:
-
                 # Attempt to fetch the user
                 user_select_statement = "SELECT userid, role FROM users WHERE email = %s AND partner = %s LIMIT 1"
                 user_row = session.execute(user_select_statement, (email_id, partner)).one()
@@ -54,15 +54,23 @@ class UserService:
                     else:
                         logger.info(f"User already exists for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
                         # If the insert was not applied, it means the user was created by another request
-                        user = session.execute(user_select_statement, (email_id, partner))
-                        user_row = user.one()
-                        return {"userId": user_row.userid, "token": self._generate_jwt_token(user_row.userid, user_row.role)}
-                else:
+                        user_row = session.execute(user_select_statement, (email_id, partner)).one()
+
+                if user_row:
                     logger.info(f"User found for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
                     return {"userId": user_row.userid, "token": self._generate_jwt_token(user_row.userid, user_row.role)}
+                else:
+                    raise RuntimeError("Failed to create or retrieve user.")
+        try:
+            user_data = await asyncio.to_thread(_sync_db_work)
+            return {
+                "userId": user_data["userId"],
+                "token": user_data["token"]
+            }
         except Exception as e:
-            logger.error(f"Failed to get or create user: {str(e)}")
-            return {}
+            logger.exception(f"Failed to get or create user: {str(e)}")
+            raise Exception(str(e))
+
 
     @staticmethod
     def _generate_jwt_token( user_id: uuid.UUID, role: str) -> str:
@@ -94,24 +102,22 @@ class UserService:
         Returns:
             List of conversations or empty list
         """
-        try:
+        def _sync_db_work():
             with CassandraDatabase().get_session() as session:
                 # Prepare and execute the CQL query to fetch chat history
                 chat_select_statement = "SELECT chatid, chattitle, createdon FROM chathistory_by_visible WHERE visible = true AND userid = %s"
                 result_set = session.execute(chat_select_statement, (user_id,))
-                # Convert the result set to a list of chat titles
-                chat_titles = []
-                for row in result_set:
-                    chat_titles.append({
+                return [
+                    {
                         "id": row.chatid,
                         "title": row.chattitle,
                         "lastActivity": row.createdon
-                    })
-
-                # Serialize and return the chat titles if any are found
-                if chat_titles:
-                    return chat_titles
-                return []
+                    }
+                    for row in result_set
+                ]
+        try:
+            chat_titles = await asyncio.to_thread(_sync_db_work)
+            return chat_titles
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get conversations: {str(ex)}")
@@ -128,16 +134,24 @@ class UserService:
         Returns:
             Conversation or blank if not found
         """
-        try:
+        def _sync_db_fetch():
             with CassandraDatabase().get_session() as session:
                 # Prepare and execute the CQL query to fetch chat history
-                chat_select_statement = "SELECT chathistoryjson, nettokenconsumption FROM chathistory_by_visible WHERE visible = true AND userid = %s AND chatid = %s LIMIT 1"
-                conversation = session.execute(chat_select_statement, (user_id, chat_id)).one()
-                
-                # Serialize and return the chat titles if any are found
-                if conversation:
-                    return {"conversation": pickle.loads(conversation.chathistoryjson), "token_consumed": conversation.nettokenconsumption}
-                raise Exception("Unable to find conversation")
+                query = "SELECT chathistoryjson, nettokenconsumption FROM chathistory_by_visible WHERE visible = true AND userid = %s AND chatid = %s LIMIT 1"
+                row = session.execute(query, (user_id, chat_id)).one()
+                if not row:
+                    return None
+                return {
+                    "conversation": pickle.loads(row.chathistoryjson),
+                    "token_consumed": row.nettokenconsumption
+                }
+        try:
+            result = await asyncio.to_thread(_sync_db_fetch)
+            if not result:
+                raise HTTPException(status_code=404, detail="Conversation not found")
+            return result
+        except HTTPException:
+            raise
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get conversation: {str(ex)}")
@@ -153,37 +167,37 @@ class UserService:
         Returns:
             List of subscribed models or empty list
         """
-        try:
+        def _sync_db_fetch():
             with CassandraDatabase().get_session() as session:
                 # First query to get model IDs from usersubscriptions
                 model_select_statement = "SELECT modelid FROM usersubscriptions WHERE userid = %s"
                 result_set = session.execute(model_select_statement, (user_id,))
 
                 model_ids = [row.modelid for row in result_set]
+                if not model_ids:
+                    return []
+                
+                # Create query with placeholders for the IN clause
+                placeholders = ','.join(['%s'] * len(model_ids))
+                deployment_name_select_statement = f"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true"
 
-                if model_ids:
-                    # Create query with placeholders for the IN clause
-                    placeholders = ','.join(['%s'] * len(model_ids))
-                    deployment_name_select_statement = f"SELECT deploymentid, deploymentname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true"
+                # Execute the query with model_ids as parameters
+                deployment_name_result_set = session.execute(deployment_name_select_statement, model_ids)
 
-                    # Execute the query with model_ids as parameters
-                    deployment_name_result_set = session.execute(deployment_name_select_statement, model_ids)
-
-                    # Process the result and return the list of models
-                    models = []
-                    for row in deployment_name_result_set:
-                        models.append({
-                            "id": row.deploymentid,
-                            "name": row.deploymentname.upper()
-                        })
-
-                    return models
-
-                return []
+                # Process the result and return the list of models
+                return [
+                    {
+                        "id": row.deploymentid,
+                        "name": row.deploymentname
+                    }
+                    for row in deployment_name_result_set
+                ]
+        try:
+            return await asyncio.to_thread(_sync_db_fetch)
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get subscribed models: {str(ex)}")
-            return []
+            raise Exception(f"Failed to get subscribed models: {str(ex)}")
     
     async def is_model_subscribed(self, userId: uuid.UUID, modelId: uuid.UUID) -> bool:
         """
@@ -196,23 +210,25 @@ class UserService:
         Returns:
             True if the model is subscribed, False otherwise
         """
-        cache_key = 'model_sub_' + str(userId) + '_' + str(modelId)
+        cache_key = f"model_sub_{userId}_{modelId}"
         try:
             model_sub = CacheRepository.get(cache_key)
             if model_sub is not None:
                 logger.info(f"Model {modelId} is subscribed for user {userId}")
                 return model_sub
-            else:
+            def _sync_check():
                 with CassandraDatabase().get_session() as session:
                     model_select_statement = "SELECT modelid FROM usersubscriptions WHERE userid = %s AND modelid = %s LIMIT 1"
                     result = session.execute(model_select_statement, (userId, modelId)).one()
-                    is_subscribed = result is not None
-                    if is_subscribed:
-                        CacheRepository.set(cache_key, is_subscribed, 60)
-                    return is_subscribed
+                    return result is not None
+            
+            is_subscribed = await asyncio.to_thread(_sync_check)
+            if is_subscribed:
+                CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
+            return is_subscribed
         except Exception as e:
             logger.error(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")
-            return False
+            raise Exception(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")
 
     async def rename_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID, new_title: str) -> bool:
         """
@@ -227,24 +243,22 @@ class UserService:
             True if successful, False otherwise
         """
         try:
-            with CassandraDatabase().get_session() as session:
-                # chat_select_statement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = %s AND chatid = %s LIMIT 1"
-                # result_set = session.execute(chat_select_statement, (user_id, chat_id)).one()
-
-                # if result_set is None:
-                #     return False  # Chat not found
-
-                chat_update_statement = "UPDATE chathistory SET chattitle = %s WHERE userid = %s AND chatid = %s IF EXISTS"
-                saved = session.execute(chat_update_statement, (new_title, user_id, chat_id))
-                if saved and saved[0].applied:
-                    logger.info(f"Successfully renamed conversation {chat_id} for user {user_id}")
-                    return True
-                logger.error(f"Failed to rename conversation {chat_id} for user {user_id}")
-                return False
+            def _sync_rename():
+                with CassandraDatabase().get_session() as session:
+                    chat_update_statement = "UPDATE chathistory SET chattitle = %s WHERE userid = %s AND chatid = %s IF EXISTS"
+                    saved = session.execute(chat_update_statement, (new_title, user_id, chat_id))
+                    return saved and saved[0].applied
+            
+            success = await asyncio.to_thread(_sync_rename)
+            if success:
+                logger.info(f"Renamed conversation {chat_id} for user {user_id}")
+            else:
+                logger.warning(f"Rename failed for conversation {chat_id} for user {user_id}")
+            return success
+        
         except Exception as ex:
-            # Log the exception
             logger.error(f"Failed to rename conversation: {str(ex)}")
-            return False
+            raise Exception(f"Failed to rename conversation: {str(ex)}")
 
     async def delete_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID) -> bool:
         """
@@ -258,22 +272,19 @@ class UserService:
             True if successful, False otherwise
         """
         try:
-            with CassandraDatabase().get_session() as session:
-                # chat_select_statement = "SELECT chatid FROM chathistory_by_visible WHERE visible = true AND userid = %s AND chatid = %s LIMIT 1"
-                # result_set = session.execute(chat_select_statement, (user_id, chat_id))
-
-                # if result_set.one() is None:
-                #     return False  # Chat not found
-
-                chat_delete_statement = "UPDATE chathistory SET visible = false WHERE userid = %s AND chatid = %s IF visible = true"
-                saved = session.execute(chat_delete_statement, (user_id, chat_id))
-
-                if saved and saved[0].applied:
-                    logger.info(f"Chat deleted with chatId: {chat_id} for user: {user_id}")
-                    return True
-                logger.error(f"Failed to delete conversation {chat_id} for user {user_id}")
-                return False
+            def _sync_delete():
+                with CassandraDatabase().get_session() as session:
+                    chat_delete_statement = "UPDATE chathistory SET visible = false WHERE userid = %s AND chatid = %s IF visible = true"
+                    saved = session.execute(chat_delete_statement, (user_id, chat_id))
+                    return saved and saved[0].applied
+                
+            success = await asyncio.to_thread(_sync_delete)
+            if success:
+                logger.info(f"Soft-deleted chat {chat_id} for user {user_id}")
+            else:
+                logger.warning(f"Soft-delete failed for chat {chat_id} for user {user_id}")
+            return success
+        
         except Exception as ex:
-            # Log the exception
             logger.error(f"Failed to delete conversation: {str(ex)}")
-            return False
+            raise Exception(f"Failed to delete conversation: {str(ex)}")
