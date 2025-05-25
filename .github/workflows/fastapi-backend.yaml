@@ -1,4 +1,4 @@
-name: Backend CI/CD
+name: FastAPI Backend CI/CD
 
 on:
   push:
