@@ -507,9 +507,9 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                 <DropdownMenuContent>
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  {/* <DropdownMenuItem>Profile</DropdownMenuItem> */}
                   {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
-                  <DropdownMenuItem>Settings</DropdownMenuItem>
+                  {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
                   <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

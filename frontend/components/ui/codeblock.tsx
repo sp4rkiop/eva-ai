@@ -3,12 +3,12 @@
 
 'use client'
 
-import { FC, memo } from 'react'
+import { FC, memo, useState } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { coldarkDark, funky, vs, vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism'
 
 import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard'
-import { IconCheck, IconCopy, IconDownload } from '@/components/ui/icons'
+import { IconCheck, IconClose, IconCopy, IconDownload, IconMenu } from '@/components/ui/icons'
 import { Button } from './button'
 
 interface Props {
@@ -58,7 +58,7 @@ export const generateRandomString = (length: number, lowercase = false) => {
 
 const CodeBlock: FC<Props> = memo(({ language, value }) => {
   const { isCopied, copyToClipboard } = useCopyToClipboard({ timeout: 2000 })
-
+  const [showLineNumbers, setShowLineNumbers] = useState(false)
   const downloadAsFile = () => {
     if (typeof window === 'undefined') {
       return
@@ -91,6 +91,9 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
     if (isCopied) return
     copyToClipboard(value)
   }
+  const toggleLineNumbers = () => {
+    setShowLineNumbers(!showLineNumbers)
+  }
 
   return (
     <div className="relative w-full font-sans codeblock bg-zinc-950">
@@ -99,29 +102,45 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
         <div className="flex items-center space-x-1 sticky">
           <Button
             variant="ghost"
-            className="hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0"
-            onClick={downloadAsFile}
-            size="icon"
+            className="hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
+            onClick={toggleLineNumbers}
           >
-            <IconDownload />
+            <div className="flex items-center space-x-1.5">
+              {showLineNumbers ? <IconClose /> : <IconMenu />}
+              <span className="text-xs">{showLineNumbers ? 'Hide Lines' : 'Show Lines'}</span>
+            </div>
+            <span className="sr-only">Toggle line numbers</span>
+          </Button>
+          <Button
+            variant="ghost"
+            className="hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
+            onClick={downloadAsFile}
+          >
+            <div className="flex items-center space-x-1.5">
+              <IconDownload />
+              <span className="text-xs">Download</span>
+            </div>
             <span className="sr-only">Download</span>
           </Button>
           <Button
             variant="ghost"
-            size="icon"
-            className="text-xs hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0"
+            className="text-xs hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
             onClick={onCopy}
           >
-            {isCopied ? <IconCheck /> : <IconCopy />}
+            <div className="flex items-center space-x-1.5">
+              {isCopied ? <IconCheck /> : <IconCopy />}
+              <span className="text-xs">{isCopied ? 'Copied' : 'Copy'}</span>
+            </div>
             <span className="sr-only">Copy code</span>
           </Button>
         </div>
       </div>
       <SyntaxHighlighter
+        showLineNumbers={showLineNumbers}
         language={language}
         style={funky}
         PreTag="div"
-        wrapLongLines
+        // wrapLongLines
         customStyle={{
           margin: 0,
           width: '100%',
@@ -130,7 +149,8 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
         }}
         codeTagProps={{
           style: {
-            fontSize: '0.875rem'
+            fontFamily: '"Cascadia Mono", Consolas, Menlo, monospace',
+            fontSize: '0.865rem',
           }
         }}
       >
