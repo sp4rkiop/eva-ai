@@ -11,7 +11,7 @@ from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
 from services.management_service import ModelData
 from langchain_openai import AzureChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import BaseMessage
@@ -40,6 +40,43 @@ class InMemoryHistory(BaseChatMessageHistory, BaseModel):
             self.messages = self.messages[:index + 1]
         else:
             raise IndexError("Message index out of range.")
+        
+class ProxyHistory(BaseChatMessageHistory):
+    """
+    A proxy wrapper around an InMemoryHistory instance that limits the number of messages 
+    exposed to consumers (e.g., a language model chain), while still allowing full history 
+    to be stored and updated.
+
+    This is useful when you want to constrain the visible conversation context—such as 
+    returning only the last N messages—without losing the complete chat history.
+
+    Attributes:
+        _full_history (InMemoryHistory): The original full message history store.
+        _limit (int): The number of most recent messages to expose when accessed.
+
+    Methods:
+        messages (list[BaseMessage]):
+            Returns the last `limit` messages from the full history.
+        add_messages(messages: list[BaseMessage]):
+            Adds new messages to the full history.
+        clear():
+            Clears the entire history in the underlying store.
+    """
+    def __init__(self, full_history: InMemoryHistory, limit: int = 4):
+        self._full_history = full_history
+        self._limit = limit
+
+    @property
+    def messages(self) -> Sequence[BaseMessage]: # type: ignore
+        # Only return the last N messages
+        return self._full_history.messages[-self._limit:]
+
+    def add_messages(self, messages: Sequence[BaseMessage]) -> None:
+        # Delegate writes to the original history
+        self._full_history.add_messages(messages)
+
+    def clear(self) -> None:
+        self._full_history.clear()
 
 class ChatService:
     def __init__(self):
@@ -109,7 +146,7 @@ class ChatService:
     def get_chat_history_by_branch(self, branch: str) -> BaseChatMessageHistory:
         if branch not in self.store:
             self.store[branch] = InMemoryHistory()
-        return self.store[branch]
+        return ProxyHistory(self.store[branch], limit=4)
 
     def append_message_to_branch(self, message: BaseMessage, branch: str) -> None:
         if branch not in self.store:
@@ -139,17 +176,17 @@ class ChatService:
             branch: Chat branch name
 
         """
-        chat_history = self.get_chat_history_by_branch(branch).messages[-4:]
         prompt = ChatPromptTemplate.from_messages([
             ("system", settings.SYSTEM_PROMPT),
-            *chat_history,
+            MessagesPlaceholder(variable_name="history"),
             ("human", "{input}"),
         ])
         chain = prompt | self.llm
         chain_with_history = RunnableWithMessageHistory(
-            chain,
+            chain, # type: ignore
             get_session_history=self.get_chat_history_by_branch,
             input_messages_key="input",
+            history_messages_key="history",
             history_factory_config=[
                 ConfigurableFieldSpec(
                     id="branch",
