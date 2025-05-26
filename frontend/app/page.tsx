@@ -54,14 +54,14 @@ export default function HomePage() {
     try {
       const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
       const userData = {
-        email: session?.user?.email,
+        email_id: session?.user?.email,
         first_name: fstNam,
         last_name: lstNam,
         partner: session?.partner,
       };
 
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`,
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

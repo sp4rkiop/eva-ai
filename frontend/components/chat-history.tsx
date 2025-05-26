@@ -32,7 +32,7 @@ import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } 
 interface ChatTitle {
   id: string;
   title: string;
-  lastActivity: string;
+  last_activity: string;
 }
 
 interface ChatHistoryProps {
@@ -191,7 +191,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     const groups: { [key: string]: ChatTitle[] } = {};
   
     chats.forEach((chat) => {
-      const lastActivity = new Date(chat.lastActivity);
+      const lastActivity = new Date(chat.last_activity);
       
       if (lastActivity >= today) {
         if (!groups['Today']) groups['Today'] = [];
@@ -260,7 +260,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             // Handle empty JSON object
             setChatTitles([]);
           } else {
-            data.sort((a: ChatTitle, b: ChatTitle) => new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime());
+            data.sort((a: ChatTitle, b: ChatTitle) => new Date(b.last_activity).getTime() - new Date(a.last_activity).getTime());
             setChatTitles(data);
             window.localStorage.setItem('chatTitles', JSON.stringify(data));
           }

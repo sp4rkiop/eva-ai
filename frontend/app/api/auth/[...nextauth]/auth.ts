@@ -12,7 +12,7 @@ export const authOptions: NextAuthOptions = {
         let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
-          email: profile.email,
+          email_id: profile.email,
           first_name: profile.given_name ?? '',
           last_name: profile.family_name ?? '',
           partner: `google-${profile.sub}`,
@@ -21,7 +21,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),
@@ -60,7 +60,7 @@ export const authOptions: NextAuthOptions = {
         let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
-          email: profile.email,
+          email_id: profile.email,
           first_name,
           last_name,
           partner: `github-${profile.id}`,
@@ -69,7 +69,7 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(userData),

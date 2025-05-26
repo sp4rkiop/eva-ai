@@ -86,46 +86,46 @@ class ChatService:
         self.branch = "main"
         self.user_service = UserService()
 
-    async def chat_shield(self, userId: uuid.UUID, modelId: uuid.UUID, userInput: str, chatId: Optional[uuid.UUID] = None) -> ChatResponse:
+    async def chat_shield(self, user_id: uuid.UUID, model_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None) -> ChatResponse:
         """
         Checks if a model is subscribed by a user and runs the chat shield on the given input.
 
         Args:
-            userId: User's UUID
-            modelId: Model's UUID
-            userInput: The message content from the user
-            chatId: Chat UUID (optional)
+            user_id: User's UUID
+            model_id: Model's UUID
+            user_input: The message content from the user
+            chat_id: Chat UUID (optional)
 
         Returns:
             ChatResponse containing the success status and chat ID if successful, or an error message if not
         """
         try:
-            if not await self.user_service.is_model_subscribed(userId, modelId):
+            if not await self.user_service.is_model_subscribed(user_id, model_id):
                 await self.send_failed_socket_message(
-                    userId, 
-                    str(chatId if chatId else userId), 
+                    user_id, 
+                    str(chat_id if chat_id else user_id), 
                     "You are not subscribed to this model"
                 )
                 return ChatResponse(success=False, error_message="Model is not subscribed")
             else:
                 available_models: List[GenerativeModel] = await ModelData.get_all_models()
                 # Find the requested model from the list
-                selected_model = next((m for m in available_models if m.deployment_id == modelId and m.is_active), None)
+                selected_model = next((m for m in available_models if m.deployment_id == model_id and m.is_active), None)
                 if selected_model is None:
                     await self.send_failed_socket_message(
-                        userId, 
-                        str(chatId if chatId else userId), 
+                        user_id, 
+                        str(chat_id if chat_id else user_id), 
                         "Selected model is not available, Try with different model"
                     )
                     return ChatResponse(success=False, error_message="Selected model not available")
                 # Initialize LLM from selected model
                 self.llm = self.get_llm_from_model(selected_model)
-                chat_id = await self.lanchain_chat(userId, userInput, chatId)
-                return ChatResponse(success=True, chat_id=chat_id)
+                new_chat_id = await self.lanchain_chat(user_id, user_input, chat_id)
+                return ChatResponse(success=True, chat_id=new_chat_id)
         except Exception as e:
             await self.send_failed_socket_message(
-                userId, 
-                str(chatId if chatId else userId), 
+                user_id, 
+                str(chat_id if chat_id else user_id), 
                 f"Something went wrong, please wait for a while. Error: {str(e)}"
             )
             return ChatResponse(success=False, error_message= "Server handling error: " + str(e))
@@ -165,14 +165,14 @@ class ChatService:
         # Store the new branch
         self.store[new_branch] = new_history
 
-    async def process_input(self, userId: uuid.UUID, chatId: str, userInput: str, branch: str):
+    async def process_input(self, user_id: uuid.UUID, chat_id: str, user_input: str, branch: str):
         """
         Process a user's input and send the response to the user's websocket.
 
         Args:
-            userId: User's UUID
-            chatId: Chat UUID
-            userInput: The message content from the user
+            user_id: User's UUID
+            chat_id: Chat UUID
+            user_input: The message content from the user
             branch: Chat branch name
 
         """
@@ -198,23 +198,23 @@ class ChatService:
                 ),
             ],
         )
-        async for chunk in chain_with_history.astream({"input": userInput},
+        async for chunk in chain_with_history.astream({"input": user_input},
                                                     config={"configurable": {"branch": branch}}):
             await ws_manager.send_to_user(
-                sid=userId, 
+                sid=user_id, 
                 message_type="StreamMessage", 
-                data={"chat_id": chatId, "content": chunk.content}
+                data={"chat_id": chat_id, "content": chunk.content}
             )
             await asyncio.sleep(0.015)  # 15ms delay
 
-    async def lanchain_chat(self, userId: uuid.UUID, userInput: str, chatId: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[str]:
+    async def lanchain_chat(self, user_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[str]:
         """
         Handles a single chat message from a user.
 
         Args:
-            userId: Unique identifier for the user.
-            userInput: The message content from the user.
-            chatId: The UUID of the chat (optional). If not provided, a new chat will be created.
+            user_id: Unique identifier for the user.
+            user_input: The message content from the user.
+            chat_id: The UUID of the chat (optional). If not provided, a new chat will be created.
             branch: The name of the chat branch (optional, default is "main").
 
         Returns:
@@ -226,11 +226,11 @@ class ChatService:
         """
 
         try:
-            if not chatId:
-                chatId = uuid.uuid4()
-                await self.process_input(userId, str(userId), userInput, branch)
+            if not chat_id:
+                chat_id = uuid.uuid4()
+                await self.process_input(user_id, str(user_id), user_input, branch)
                 token_uses = 0
-                chat_title = await self.generate_chat_title(userInput)
+                chat_title = await self.generate_chat_title(user_input)
                 last_message = self.store[branch].messages[-1]
                 if hasattr(last_message, 'usage_metadata'):
                     token_uses = last_message.usage_metadata.get('total_tokens', 0)
@@ -239,21 +239,21 @@ class ChatService:
                 def _save_new_chat():
                     with CassandraDatabase.get_session() as session:
                         chat_insert_statement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption, visible) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                        return session.execute(chat_insert_statement, (userId, chatId, chat_title['content'], chat_blob, datetime.now(timezone.utc), total_tokens, True))
+                        return session.execute(chat_insert_statement, (user_id, chat_id, chat_title['content'], chat_blob, datetime.now(timezone.utc), total_tokens, True))
                 chat_saved = await asyncio.to_thread(_save_new_chat)
-                if chat_saved and getattr(chat_saved[0], 'applied', True):
-                    logger.info(f"Chat saved with chatId: {chatId} for user: {userId}")
+                if not chat_saved or not getattr(chat_saved[0], 'applied', True):
+                    logger.info(f"Failed to save chat with chat_id: {chat_id} for user: {user_id}")
                 await ws_manager.send_to_user(
-                    sid=userId, 
+                    sid=user_id, 
                     message_type="EndStream", 
                     data=""
                 )
-                return str(chatId)
+                return str(chat_id)
             else:
-                chat_history_data = await self.user_service.get_single_conversation(userId, chatId)
+                chat_history_data = await self.user_service.get_single_conversation(user_id, chat_id)
                 self.store = chat_history_data['conversation']
                 token_used = chat_history_data['token_consumed']
-                await self.process_input(userId, str(chatId), userInput, branch)
+                await self.process_input(user_id, str(chat_id), user_input, branch)
                 last_message = self.store[branch].messages[-1]
                 if hasattr(last_message, 'usage_metadata'):
                     token_used += last_message.usage_metadata.get('total_tokens', 0)
@@ -262,12 +262,12 @@ class ChatService:
                 def _update_existing_chat():
                     with CassandraDatabase.get_session() as session:
                         chat_update_statement = "UPDATE chathistory SET chathistoryjson = %s, createdon = %s, nettokenconsumption = %s WHERE userid = %s AND chatid = %s"
-                        return session.execute(chat_update_statement, (pickle.dumps(self.store), datetime.now(timezone.utc), token_used, userId, chatId))
+                        return session.execute(chat_update_statement, (updated_blob, datetime.now(timezone.utc), token_used, user_id, chat_id))
                 chat_saved = await asyncio.to_thread(_update_existing_chat)
-                if chat_saved and getattr(chat_saved[0], 'applied', True):
-                    logger.info(f"Chat updated with chatId: {chatId} for user: {userId}")
+                if not chat_saved or not getattr(chat_saved[0], 'applied', True):
+                    logger.info(f"Failed to update chat with chat_id: {chat_id} for user: {user_id}")
                 await ws_manager.send_to_user(
-                    sid=userId, 
+                    sid=user_id, 
                     message_type="EndStream", 
                     data=""
                 )
@@ -275,7 +275,7 @@ class ChatService:
             logger.error(f"Error processing chat: {e}")
             raise Exception("Something went wrong, please wait for a while.")
 
-    async def generate_chat_title(self, userInput: str) -> Dict[str, Any]:
+    async def generate_chat_title(self, user_input: str) -> Dict[str, Any]:
         """
         Generate a concise title for a chat message.
 
@@ -284,7 +284,7 @@ class ChatService:
         5 words.
 
         Args:
-            userInput: The message content from which the title is to be generated.
+            user_input: The message content from which the title is to be generated.
 
         Returns:
             A dictionary containing:
@@ -307,7 +307,7 @@ class ChatService:
                 ]
             )
             chain = prompt | self.llm
-            response = await chain.ainvoke({"input": userInput})
+            response = await chain.ainvoke({"input": user_input})
             raw_content = response.content
             if isinstance(raw_content, str):
                 clear_output = re.sub(r'^"(.*)"$', r'\1', raw_content)
@@ -319,22 +319,22 @@ class ChatService:
             logger.error(f"Failed to generate title with error: {str(e)}")
             return {"content": "Failed to generate title", "token_uses": 0}
     
-    async def send_failed_socket_message(self, userId: uuid.UUID, chatId: str, message: str):
+    async def send_failed_socket_message(self, user_id: uuid.UUID, chat_id: str, message: str):
         """
         Send a failed socket message to the user.
 
         Args:
-            userId: The ID of the user to send the message to.
-            chatId: The ID of the chat to send the message to.
+            user_id: The ID of the user to send the message to.
+            chat_id: The ID of the chat to send the message to.
             message: The message to send.
         """
         await ws_manager.send_to_user(
-            sid=userId, 
+            sid=user_id, 
             message_type="StreamMessage", 
-            data={"chat_id": chatId, "content": message}
+            data={"chat_id": chat_id, "content": message}
         )
         await ws_manager.send_to_user(
-            sid=userId,
+            sid=user_id,
             message_type="EndStream", 
             data=""
         )

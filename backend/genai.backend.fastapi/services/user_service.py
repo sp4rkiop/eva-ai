@@ -50,7 +50,7 @@ class UserService:
                         subscription_insert_statement = "INSERT INTO usersubscriptions (userid, modelid) VALUES (%s, %s) IF NOT EXISTS"
                         session.execute(subscription_insert_statement, (user_id, default_model_id))
                         logger.info(f"New user created for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-                        return {"userId": user_id, "token": self._generate_jwt_token(user_id, default_role)}
+                        return {"user_id": user_id, "token": self._generate_jwt_token(user_id, default_role)}
                     else:
                         logger.info(f"User already exists for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
                         # If the insert was not applied, it means the user was created by another request
@@ -58,13 +58,13 @@ class UserService:
 
                 if user_row:
                     logger.info(f"User found for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-                    return {"userId": user_row.userid, "token": self._generate_jwt_token(user_row.userid, user_row.role)}
+                    return {"user_id": user_row.userid, "token": self._generate_jwt_token(user_row.userid, user_row.role)}
                 else:
                     raise RuntimeError("Failed to create or retrieve user.")
         try:
             user_data = await asyncio.to_thread(_sync_db_work)
             return {
-                "userId": user_data["userId"],
+                "user_id": user_data["user_id"],
                 "token": user_data["token"]
             }
         except Exception as e:
@@ -111,7 +111,7 @@ class UserService:
                     {
                         "id": row.chatid,
                         "title": row.chattitle,
-                        "lastActivity": row.createdon
+                        "last_activity": row.createdon
                     }
                     for row in result_set
                 ]
@@ -199,7 +199,7 @@ class UserService:
             logger.error(f"Failed to get subscribed models: {str(ex)}")
             raise Exception(f"Failed to get subscribed models: {str(ex)}")
     
-    async def is_model_subscribed(self, userId: uuid.UUID, modelId: uuid.UUID) -> bool:
+    async def is_model_subscribed(self, user_id: uuid.UUID, model_id: uuid.UUID) -> bool:
         """
         Check if a model is subscribed by a user.
         
@@ -210,26 +210,26 @@ class UserService:
         Returns:
             True if the model is subscribed, False otherwise
         """
-        cache_key = f"model_sub_{userId}_{modelId}"
+        cache_key = f"model_sub_{user_id}_{model_id}"
         try:
             model_sub = CacheRepository.get(cache_key)
             if model_sub is not None:
-                logger.info(f"Model {modelId} is subscribed for user {userId}")
+                logger.info(f"Model {model_id} is subscribed for user {user_id}")
                 return model_sub
             def _sync_check():
                 with CassandraDatabase().get_session() as session:
                     model_select_statement = "SELECT modelid FROM usersubscriptions WHERE userid = %s AND modelid = %s LIMIT 1"
-                    result = session.execute(model_select_statement, (userId, modelId)).one()
+                    result = session.execute(model_select_statement, (user_id, model_id)).one()
                     return result is not None
             
             is_subscribed = await asyncio.to_thread(_sync_check)
             if is_subscribed:
                 CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
-                logger.info(f"Model {modelId} is subscribed for user {userId}")
+                logger.info(f"Model {model_id} is subscribed for user {user_id}")
             return is_subscribed
         except Exception as e:
-            logger.error(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")
-            raise Exception(f"Failed to check if model is subscribed for user {userId} and model {modelId} with error: {str(e)}")
+            logger.error(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
+            raise Exception(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
 
     async def rename_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID, new_title: str) -> bool:
         """

@@ -66,13 +66,13 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     }, []);
     const getuId_token = async () => {
         const userData = {
-            email: uMail,
+            email_id: uMail,
             first_name: fName,
             last_name: lName,
             partner: partner,
         };
     
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/UserId`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -127,9 +127,9 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                     "Authorization": `Bearer ${back_auth}`
                 },
                 body: JSON.stringify({
-                    modelId: chatService.selectedModelId$.value,
-                    userInput: text,
-                    chatId: currentChatId
+                    model_id: chatService.selectedModelId$.value,
+                    user_input: text,
+                    chat_id: currentChatId
                 })
             });
             if (!response.ok) {

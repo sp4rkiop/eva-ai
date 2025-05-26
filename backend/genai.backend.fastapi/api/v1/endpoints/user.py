@@ -1,8 +1,7 @@
 import uuid
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Path, Query, Response
-from models.auth_model import AuthRequest
-from models.request_model import DeleteRequest
+from models.request_model import DeleteRequest, AuthRequest
 from services.user_service import UserService
 from dependencies.auth_dependencies import get_current_user
 from repositories.websocket_manager import ws_manager
@@ -10,18 +9,18 @@ from repositories.websocket_manager import ws_manager
 router = APIRouter()
 def get_user_service() -> UserService:
     return UserService()
-@router.post("/UserId")
+@router.post("/authenticate")
 async def login_signup(
     signup_request: AuthRequest, 
     user_service: UserService = Depends(get_user_service)):
     try:
         result = await user_service.get_create_user(
-            signup_request.email, 
+            signup_request.email_id, 
             signup_request.first_name, 
             signup_request.last_name, 
             signup_request.partner
         )
-        response = Response(content=str(result["userId"]), media_type="text/plain")
+        response = Response(content=str(result["user_id"]), media_type="text/plain")
         response.headers["Authorization"] = f"{result["token"]}"
         return response
     except Exception as e:
