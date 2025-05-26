@@ -66,9 +66,9 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     }, []);
     const getuId_token = async () => {
         const userData = {
-            emailId: uMail,
-            firstName: fName,
-            lastName: lName,
+            email: uMail,
+            first_name: fName,
+            last_name: lName,
             partner: partner,
         };
     

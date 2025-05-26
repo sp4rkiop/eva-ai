@@ -62,9 +62,9 @@ export default function IndexPage() {
     try {
       const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
       const userData = {
-        emailId: session?.user?.email,
-        firstName: fstNam,
-        lastName: lstNam,
+        email: session?.user?.email,
+        first_name: fstNam,
+        last_name: lstNam,
         partner: session?.partner,
       };
 
