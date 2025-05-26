@@ -35,14 +35,14 @@ Eva is an ambitious project that aims to replicate the core functionalities of C
 
 ## Technologies Used
 
-- **Backend**: .NET ASP Core Web API, LLM, Semantic Kernel, SignalR, WebSocket, MySQL, Azure OpenAI Models.
+- **Backend**: Python FastAPI, Langchain, WebSocket, ScyllaDB, Azure OpenAI Models. OLD [.NET ASP Core Web API, Semantic Kernel, SignalR]
 - **Frontend**: Next.js, TypeScript, Tailwind CSS.
 
 ## Installation
 
-1. Clone the repository: `git clone https://github.com/sp4rkiop/genai-chat.git`
-2. Navigate to the project directory: `cd genai-chat`
-3. Start the backend development server in Visual Studio simply
+1. Clone the repository: `git clone https://github.com/sp4rkiop/eva-ai.git`
+2. Navigate to the project directory: `cd eva-ai`
+3. Start the backend development server, needs a ScyllaDB / Cassandra instance.
 4. Install dependencies of frontend: `npm install` or `yarn install`
 5. Start the frontend development server: `npm run dev` or `yarn dev`
 

@@ -32,7 +32,7 @@ async def scheduled_data_fetch():
 app = FastAPI(
     title="Eva", 
     lifespan=lifespan,
-    # openapi_url="", # remove this line to enable API documentation
+    openapi_url="", # remove this line to enable API documentation
     )
 
 # Add CORS middleware
