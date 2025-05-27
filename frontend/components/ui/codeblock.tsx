@@ -107,7 +107,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
           >
             <div className="flex items-center space-x-1.5">
               {showLineNumbers ? <IconClose /> : <IconMenu />}
-              <span className="text-xs">{showLineNumbers ? 'Hide Lines' : 'Show Lines'}</span>
+              <span className="hidden md:block text-xs">{showLineNumbers ? 'Hide Lines' : 'Show Lines'}</span>
             </div>
             <span className="sr-only">Toggle line numbers</span>
           </Button>
@@ -118,7 +118,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
           >
             <div className="flex items-center space-x-1.5">
               <IconDownload />
-              <span className="text-xs">Download</span>
+              <span className="hidden md:block text-xs">Download</span>
             </div>
             <span className="sr-only">Download</span>
           </Button>
@@ -129,7 +129,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
           >
             <div className="flex items-center space-x-1.5">
               {isCopied ? <IconCheck /> : <IconCopy />}
-              <span className="text-xs">{isCopied ? 'Copied' : 'Copy'}</span>
+              <span className="hidden md:block text-xs">{isCopied ? 'Copied' : 'Copy'}</span>
             </div>
             <span className="sr-only">Copy code</span>
           </Button>

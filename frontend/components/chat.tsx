@@ -410,7 +410,7 @@ useEffect(() => {
                         (messages.map((message, index) => (
                           <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
                             <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
-                              <div className="flex-shrink-0 flex flex-col relative items-end">
+                              <div className="hidden flex-shrink-0 md:flex flex-col relative items-end">
                                 <div>
                                   <div className="pt-0.5">
                                     <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full">
@@ -424,7 +424,7 @@ useEffect(() => {
                                 </div>
                               </div>
                               <div className='relative overflow-hidden flex w-full flex-col'>
-                                <div className="font-bold select-none capitalize">
+                                <div className="hidden md:inline-block font-bold select-none capitalize">
                                   {message.role === 'user' ? (fName) : ('Eva')}</div>
                                 <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
                                   <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
@@ -432,7 +432,7 @@ useEffect(() => {
                                       <SkeletonLoader />
                                     ) : (
                                       message.role === 'assistant' ? (<MemoizedReactMarkdown
-                                        className="pl-4 prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base"
+                                        className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base" //pl-4
                                         remarkPlugins={[remarkGfm, remarkMath]}
                                         rehypePlugins={[rehypeKatex]}
                                         components={{
