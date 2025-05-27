@@ -10,7 +10,7 @@
 </table>
 <div align='center'><img src='https://visitor-badge.laobi.icu/badge?page_id=sp4rkiop.eva-ai'/></div>
 <div align='center'><img src='assets/images/img1.png' alt='Image Demo' /></div>
-Eva is an AI-powered chatbot designed to surpass the functionality of ChatGPT, offering a seamless conversational experience. Built with cutting-edge technologies, it aims to provide an open-source alternative for developers and enthusiasts looking to explore AI chatbots.
+Eva is an AI-powered chatbot designed to surpass the functionality of leading GPT Apps, offering a seamless conversational experience. Built with cutting-edge technologies, it aims to provide an open-source alternative for developers and enthusiasts looking to explore AI chatbots.
 
 ## Table of Contents
 
@@ -24,7 +24,7 @@ Eva is an AI-powered chatbot designed to surpass the functionality of ChatGPT, o
 
 ## Project Overview
 
-Eva is an ambitious project that aims to replicate the core functionalities of ChatGPT, leveraging advanced AI models and technologies. While the project strives to be a perfect open-source clone of ChatGPT, it acknowledges the challenge of replicating the UI design and user experience perfectly. The project is driven by the desire to explore and understand the capabilities of AI chatbots, with a particular focus on semantic services and kernel memory implementation.
+Eva is an ambitious project that aims to replicate the core functionalities of leading GPT Apps, leveraging advanced AI models and technologies. While the project strives to be a perfect open-source clone of leading GPT Apps, it acknowledges the challenge of replicating the UI design and user experience perfectly. The project is driven by the desire to explore and understand the capabilities of AI chatbots, with a particular focus on semantic services and kernel memory implementation.
 
 ## Features
 
