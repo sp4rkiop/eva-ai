@@ -18,6 +18,7 @@ import 'katex/dist/katex.min.css';
 import rehypeKatex from 'rehype-katex';
 import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
+import { authenticateUser } from '@/lib/utils';
 
 interface ChatProps {
     chatId?: string;
@@ -65,42 +66,27 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
       }
     }, []);
     const getuId_token = async () => {
-        const userData = {
-            email_id: uMail,
-            first_name: fName,
-            last_name: lName,
-            partner: partner,
-        };
-    
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(userData),
-        });
-    
-        if (!response.ok) {
-          toast({
-            variant: "destructive",
-            title: "Uh oh! Something went wrong.",
-            description: "There was a problem verifying your account. Code: " + response.status,
-            duration: 1500
+        try {
+          const userData = {
+              email_id: uMail,
+              first_name: fName,
+              last_name: lName,
+              partner: partner,
+          };
+      
+          const { back_auth, userid } = await authenticateUser(userData);
+      
+          // Update session with new token
+          await update({
+              back_auth: back_auth,
+              userid: userid,
           });
-            // throw new Error("Failed to send user data to the server");
+      
+          // Return the token
+          return back_auth;
+        } catch (error) {
+            throw new Error(error instanceof Error ? error.message : "There was a problem verifying your account.");
         }
-    
-        const userid = await response.text();
-        const back_auth = response.headers.get('authorization');
-    
-        // Update session with new token
-        await update({
-            back_auth: back_auth,
-            userid: userid,
-        });
-    
-        // Return the token
-        return back_auth;
     };
     const handleMessageSubmit = async (text: string) => {
         try {
@@ -133,12 +119,6 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                 })
             });
             if (!response.ok) {
-                toast({
-                  variant: "destructive",
-                  title: "Uh oh! Something went wrong.",
-                  description: `There was a problem with your conversation. Status: ${response.status} : ${await response.text().then(t => t.split('\n')[0])}`,
-                  duration: 1500
-                });
                 if (response.status === 401) {
                     const newToken = await getuId_token();
                     response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
@@ -154,7 +134,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                       })
                     });
                 } else {
-                    return;
+                  throw new Error(`There was a problem with your conversation. Status: ${response.status} : ${await response.text().then(t => t.split('\n')[0])}`);
                 }
             }
             const responseJson = await response.json();

@@ -41,3 +41,34 @@ export function formatDate(input: string | number | Date): string {
     year: 'numeric'
   })
 }
+
+export async function authenticateUser(userData: {
+  email_id: string;
+  first_name: string;
+  last_name: string;
+  partner: string;
+}): Promise<{ back_auth: string; userid: string }> {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+    });
+
+    if (!response.ok) {
+      throw new Error("status: " + response.status);
+    }
+
+    const back_auth = response.headers.get('x-auth-token') || '';
+    const userid = await response.text();
+
+    // Throw error if we don't get a valid token
+    if (!back_auth || back_auth.trim() === '') {
+      throw new Error('No authentication token received from server');
+    }
+
+    return { back_auth, userid };
+  } catch (error) {
+    throw error;
+  }
+}

@@ -42,7 +42,7 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
             toast({
               variant: "destructive",
               title: "Uh oh! Something went wrong.",
-              description: "There was a problem verifying your account. Code: " + response.status,
+              description: "Token expired. Trying to refresh. Code: " + response.status,
               duration: 1500
             });
             const newToken = await getuId_token();
@@ -62,7 +62,7 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
           toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "Failed to maintain Models:" + error as string,
+            description: "Failed to fetch Models:" + error as string,
             duration: 1500
           });
           // console.error('Error:', error);

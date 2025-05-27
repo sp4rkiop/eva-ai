@@ -6,6 +6,7 @@ import { ChatService } from '@/lib/service';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { useToast } from '@/components/ui/use-toast';
+import { authenticateUser } from '@/lib/utils';
 
 // Extend next-auth session type to include custom properties
 declare module "next-auth" {
@@ -35,6 +36,9 @@ const decodeJWT = (token: string) => {
 };
 
 const isTokenExpired = (token: string): boolean => {
+  // Return true for empty/invalid tokens
+  if (!token || token.trim() === '') return true;
+
   const decoded = decodeJWT(token);
   if (!decoded?.exp) return true;
   
@@ -49,56 +53,6 @@ export default function HomePage() {
   const chatService = useMemo(() => ChatService.getInstance(), []);
   const isRefreshing = useRef(false); // Add ref to track refresh state
   const { toast } = useToast();
-
-  const getuId_token = async (): Promise<[string, string]> => {
-    try {
-      const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
-      const userData = {
-        email_id: session?.user?.email,
-        first_name: fstNam,
-        last_name: lstNam,
-        partner: session?.partner,
-      };
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(userData),
-        }
-      );
-
-      if (!response.ok){
-        toast({
-          variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem refreshing your token. Code: " + response.status,
-          duration: 1500
-        });
-      }
-      
-      const userid = await response.text();
-      const back_auth = response.headers.get('authorization') || '';
-
-      await update({
-        back_auth,
-        userid
-      });
-
-      return [back_auth, userid];
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Uh oh! Something went wrong.",
-        description: "Token refresh failed:" + error as string,
-        duration: 1500
-      });
-      // console.error("Token refresh failed:", error);
-      router.push('/login?error=session_expired');
-      return ["", ""];
-    }
-  };
 
   // Redirect unauthenticated users
   useEffect(() => {
@@ -118,18 +72,45 @@ export default function HomePage() {
         let currentUserId = session.userid;
 
         // Refresh token if expired
-        if (currentAuth && isTokenExpired(currentAuth)) {
+        if (!currentAuth || isTokenExpired(currentAuth)) {
           toast({
             description: "Token expired. Refreshing token...",
             duration: 1500
           });
-          [currentAuth, currentUserId] = await getuId_token();
+          const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
+          const userData = {
+            email_id: session?.user?.email || 'noemail@eva',
+            first_name: fstNam,
+            last_name: lstNam,
+            partner: session?.partner || 'Eva',
+          };
+
+          const { back_auth, userid } = await authenticateUser(userData);
+
+          // Throw error if we don't get a valid token
+          if (!back_auth || back_auth.trim() === '') {
+            throw new Error('No authentication token received from server');
+          }
+
+          await update({ back_auth, userid });
+          currentAuth = back_auth;
+          currentUserId = userid;
         }
+        // Set auth token and user ID -> init chat service
         if (currentAuth && currentUserId) {
           setIsInitialized(true);
           chatService.authToken$.next(currentAuth);
           chatService.userId$.next(currentUserId);
         }
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Authentication Failed",
+          description: error instanceof Error ? error.message : "Token refresh failed",
+          duration: 3000
+        });
+        router.push('/login?error=session_expired');
+        throw error;
       } finally {
         isRefreshing.current = false;
       }

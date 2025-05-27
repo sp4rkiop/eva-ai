@@ -11,6 +11,8 @@ export class ChatService {
   public HubConnectionState$ = new BehaviorSubject<string>('Disconnected');
   public userId$ = new BehaviorSubject<string>('');
   public authToken$ = new BehaviorSubject<string>('');
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
 
   private constructor() {
     let previousAuthToken = '';
@@ -40,6 +42,7 @@ export class ChatService {
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {
+        this.reconnectAttempts = 0; // Reset on successful connection
         this.HubConnectionState$.next('Connected');
         console.log('[WebSocket] Connected');
       };
@@ -47,10 +50,12 @@ export class ChatService {
       this.socket.onclose = () => {
         this.HubConnectionState$.next('Disconnected');
         console.log('[WebSocket] Disconnected');
+        this.reconnectWithBackoff(); // <-- auto-reconnect
       };
 
       this.socket.onerror = (err) => {
         console.error('[WebSocket] Error:', err);
+        this.reconnectWithBackoff(); // <-- also reconnect on error
       };
 
       this.socket.onmessage = (event) => {
@@ -93,6 +98,20 @@ export class ChatService {
   public reconnect(): void {
     this.stop();
     this.start();
+  }
+  private reconnectWithBackoff(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      console.error('[WebSocket] Max reconnect attempts reached.');
+      return;
+    }
+
+    const delay = Math.pow(2, this.reconnectAttempts) * 1000; // 1s, 2s, 4s, 8s...
+    console.log(`[WebSocket] Attempting to reconnect in ${delay / 1000}s...`);
+
+    setTimeout(() => {
+      this.reconnectAttempts++;
+      this.start();
+    }, delay);
   }
 
   public isConnectionConnected(): boolean {

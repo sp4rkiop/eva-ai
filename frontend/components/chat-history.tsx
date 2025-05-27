@@ -96,86 +96,104 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   };
 
   const handleRename = (chatId: string, newTitle: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}?title=${newTitle}`, {
-      method: "PATCH",
-      headers: {
-        "Authorization": `Bearer ${back_auth}`
-      },
-    }).then(async (res) => {
-      if(res.status === 401) {
-        toast({
-          variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem verifying your account. Code: " + res.status,
-          duration: 1500
-        });
-        await getuId_token();
-        return handleRename(chatId, newTitle);
-      }else if (res.status === 204) {
-        toast({
-          description: "Chat title updated",
-          duration: 1500
-        });
-        const updatedTitles = chatTitles.map((t) => {
-          if (t.id === chatId) {
-            return { ...t, title: newTitle };
-          }
-          return t;
-        });
-        setChatTitles(updatedTitles);
-        
-        // Update filtered titles if we're in search mode
-        if (searchText.trim() !== "") {
-          setFilteredTitles(updatedTitles.filter(chat => 
-            chat.title.toLowerCase().includes(searchText.toLowerCase())
-          ));
+    try {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}?title=${newTitle}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": `Bearer ${back_auth}`
+        },
+      }).then(async (res) => {
+        if(res.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "Token expired. Trying to refresh. Code: " + res.status,
+            duration: 1500
+          });
+          await getuId_token();
+          return handleRename(chatId, newTitle);
+        } else if (res.status === 204) {
+            toast({
+              description: "Chat title updated",
+              duration: 1500
+            });
+            const updatedTitles = chatTitles.map((t) => {
+              if (t.id === chatId) {
+                return { ...t, title: newTitle };
+              }
+              return t;
+            });
+            setChatTitles(updatedTitles);
+            
+            // Update filtered titles if we're in search mode
+            if (searchText.trim() !== "") {
+              setFilteredTitles(updatedTitles.filter(chat => 
+                chat.title.toLowerCase().includes(searchText.toLowerCase())
+              ));
+            }
+        } else {
+          throw new Error("There was a problem renaming the chat. Code: " + res.status);
         }
-    } else {
-        toast({
-          variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem renaming the chat. Code: " + res.status,
-          duration: 1500
-        });
-      }
       })
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: error instanceof Error ? error.message : "There was a problem renaming the chat.",
+        duration: 1500
+      });
+    }
   };
   
   const handleDelete = (chatId: string) => {
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${back_auth}`
-      },
-      body: JSON.stringify({ delete: true }),
-    }).then(async (res) => {
-      if(res.status === 401) {
-        toast({
-          variant: "destructive",
-          title: "Uh oh! Something went wrong.",
-          description: "There was a problem verifying your account. Code: " + res.status,
-          duration: 1500
-        });
-        await getuId_token();
-        return handleDelete(chatId);
-      }else if (res.status === 204) {
-        toast({
-          description: "Chat deleted",
-          duration: 1500
-        });
-        const updatedTitles = chatTitles.filter((t) => t.id !== chatId);
-        setChatTitles(updatedTitles);
-        
-        // Update filtered titles if we're in search mode
-        if (searchText.trim() !== "") {
-          setFilteredTitles(updatedTitles.filter(chat => 
-            chat.title.toLowerCase().includes(searchText.toLowerCase())
-          ));
+    try {
+      fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${back_auth}`
+        },
+        body: JSON.stringify({ delete: true }),
+      }).then(async (res) => {
+        if(res.status === 401) {
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: "Token expired. Trying to refresh. Code: " + res.status,
+            duration: 1500
+          });
+          await getuId_token();
+          return handleDelete(chatId);
+        }else if (res.status === 204) {
+          toast({
+            description: "Chat deleted",
+            duration: 1500
+          });
+          const updatedTitles = chatTitles.filter((t) => t.id !== chatId);
+          setChatTitles(updatedTitles);
+          
+          // Update filtered titles if we're in search mode
+          if (searchText.trim() !== "") {
+            setFilteredTitles(updatedTitles.filter(chat => 
+              chat.title.toLowerCase().includes(searchText.toLowerCase())
+            ));
+          }
+          
+          onNewChatClick();
+        }  else {
+          throw new Error("There was a problem deleting the chat. Code: " + res.status);
         }
-        
-        onNewChatClick();
-    }})
+      })
+
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: error instanceof Error ? error.message : "There was a problem deleting the chat.",
+        duration: 1500
+      });
+    }
   };
   
   const groupChatsByDate = (chats: ChatTitle[]): { [key: string]: ChatTitle[] } => {
@@ -248,7 +266,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
-            description: "There was a problem verifying your account. Code: " + response.status,
+            description: "Token expired. Trying to refresh. Code: " + response.status,
             duration: 1500
           });
           const newToken = await getuId_token();

@@ -1,6 +1,7 @@
 import { User, type NextAuthOptions } from "next-auth";
 import GoogleProvider, { GoogleProfile } from "next-auth/providers/google";
 import GithubProvider, { GithubProfile } from "next-auth/providers/github";
+import { authenticateUser } from "@/lib/utils";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -8,8 +9,6 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       async profile(profile: GoogleProfile) {
-        let back_auth = "";
-        let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
           email_id: profile.email,
@@ -19,35 +18,16 @@ export const authOptions: NextAuthOptions = {
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-        try {
-          // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(userData),
-          });
+        const { back_auth, userid } = await authenticateUser(userData);
 
-          if (!response.ok) {
-            throw new Error("status: " + response.status);
-          }
-
-          back_auth = response.headers.get('authorization') || "";
-          userid = await response.text();
-        } catch (error) {
-          console.error("Error fetching user ID or auth token:", error);
-          throw error; // Ensure the error propagates and prevents login
-        }
-
-        const user = {
+        return {
           id: profile.sub,
           name: profile.name ?? profile.email,
           email: profile.email,
           image: profile.picture,
           back_auth,
-          userid
+          userid,
         } as User;
-
-        return user;
       }
     }),
     GithubProvider({
@@ -56,45 +36,25 @@ export const authOptions: NextAuthOptions = {
       async profile(profile: GithubProfile) {
         // Extract first name and last name from the name field
         const [first_name = "", last_name = ""] = (profile.name ?? "").split(" ");
-        let back_auth = "";
-        let userid = "";
         // Construct the data object to be sent to your API
         const userData = {
-          email_id: profile.email,
+          email_id: `${profile.email}`,
           first_name,
           last_name,
           partner: `github-${profile.id}`,
         };
         // process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-        try {
-          // Send userData to your API endpoint
-          const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/authenticate`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(userData),
-          });
+        const { back_auth, userid } = await authenticateUser(userData);
 
-          if (!response.ok) {
-            throw new Error("status: " + response.status);
-          }
-
-          back_auth = response.headers.get('authorization') || "";
-          userid = await response.text();
-        } catch (error) {
-          console.error("Error fetching user ID or auth token:", error);
-          throw error; // Ensure the error propagates and prevents login
-        }
-
-        const user ={
+        return {
           id: `${profile.id}`,
           name: profile.name ?? profile.login,
           email: profile.email,
           image: profile.avatar_url,
           back_auth,
-          userid
+          userid,
         } as User;
-        return user;
       },
     }),
   ],

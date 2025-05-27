@@ -21,7 +21,7 @@ async def login_signup(
             signup_request.partner
         )
         response = Response(content=str(result["user_id"]), media_type="text/plain")
-        response.headers["Authorization"] = f"{result["token"]}"
+        response.headers["X-Auth-Token"] = f"{result["token"]}"
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
