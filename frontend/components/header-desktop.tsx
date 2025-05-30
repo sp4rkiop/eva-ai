@@ -112,7 +112,7 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
         <div className="hidden md:block left-0 right-0 py-2">
             <div className="sticky top-0 mb-1.5 flex items-center justify-between z-10 h-14 p-2 font-semibold bg-token-main-surface-primary">
                 <div className="absolute left-1/2 -translate-x-1/2"></div>
-                <div className="flex items-center gap-2 hover-light-dark dark:hover:bg-neutral-900 rounded-md">
+                <div className="flex items-center gap-2 hover-light-dark dark:hover:bg-neutral-950 rounded-md">
                     <DropdownMenu>
                       <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
                           {selectedModel || 'Default Model'}

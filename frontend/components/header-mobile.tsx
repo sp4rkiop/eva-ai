@@ -114,13 +114,13 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
   
   return (
     <div className="text-token-primary sticky top-0 z-10 flex min-h-[40px] items-center justify-center border-b pl-1 md:hidden">
-      <button type="button" className="absolute bottom-0 left-0 top-0 inline-flex items-center justify-center rounded-md px-3 hover-light-dark dark:hover:bg-neutral-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white active:opacity-50" onClick={toggleChatHistoryVisibility}>
+      <button type="button" className="absolute bottom-0 left-0 top-0 inline-flex items-center justify-center rounded-md px-3 hover-light-dark dark:hover:bg-neutral-950 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white active:opacity-50" onClick={toggleChatHistoryVisibility}>
         <span className="sr-only">Open sidebar</span>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path fillRule="evenodd" clipRule="evenodd" d="M3 8C3 7.44772 3.44772 7 4 7H20C20.5523 7 21 7.44772 21 8C21 8.55228 20.5523 9 20 9H4C3.44772 9 3 8.55228 3 8ZM3 16C3 15.4477 3.44772 15 4 15H14C14.5523 15 15 15.4477 15 16C15 16.5523 14.5523 17 14 17H4C3.44772 17 3 16.5523 3 16Z" fill="currentColor"></path>
         </svg>
       </button>
-      <div className="group flex cursor-pointer items-center gap-1 rounded-md hover-light-dark dark:hover:bg-neutral-900">
+      <div className="group flex cursor-pointer items-center gap-1 rounded-md hover-light-dark dark:hover:bg-neutral-950">
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
               {selectedModel || 'Default Model'}

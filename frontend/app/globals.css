@@ -29,6 +29,14 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
@@ -56,10 +64,15 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
   }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
@@ -67,6 +80,7 @@
     @apply bg-background text-foreground;
   }
 }
+
 
 :root{
   --white: #fff;
@@ -87,13 +101,6 @@
   --red-700: #b91c1c;
   --brand-purple: #ab68ff;
 }
-/* .dark,
-:root[class~='dark'] {
-  
-}
-.light {
-  
-} */
 .btn {
   align-items: center;
   border-color: transparent;
@@ -191,6 +198,14 @@
     --sidebar-surface-primary: var(--gray-900);
     --sidebar-surface-secondary: var(--gray-800);
     --sidebar-surface-tertiary: var(--gray-750);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
     --link: #7ab7ff;
     --link-hover: #5e83b3;
     --surface-error: 249 58 55;
@@ -254,6 +269,10 @@
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-200);
   }
+  ::selection {
+    background-color: white;
+    color: black;
+  }
   
 }
 
@@ -281,6 +300,14 @@
     --sidebar-surface-primary: var(--gray-50);
     --sidebar-surface-secondary: var(--gray-100);
     --sidebar-surface-tertiary: var(--gray-200);
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
     --link: #2964aa;
     --link-hover: #749ac8;
     --selection: #007aff;
@@ -343,6 +370,10 @@
     transform: translateY(-0.15rem) rotate(-15deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-700);
+  }
+  ::selection {
+    background-color: black;
+    color: white;
   }
 }
 

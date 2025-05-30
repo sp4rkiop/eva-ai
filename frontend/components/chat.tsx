@@ -19,6 +19,9 @@ import rehypeKatex from 'rehype-katex';
 import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
 import { authenticateUser } from '@/lib/utils';
+import { IconCheck, IconCopy } from './ui/icons';
+import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard'
+import { Button } from './ui/button';
 
 interface ChatProps {
     chatId?: string;
@@ -40,6 +43,7 @@ interface Message {
 
 
 const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uImg, partner, userid, back_auth}) => {
+    const { isCopied, copyToClipboard } = useCopyToClipboard({ timeout: 2000 })  
     const { data: session, status, update } = useSession();
     const [messages, setMessages] = useState<Message[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | undefined>(chatId);
@@ -52,6 +56,11 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const userInteractedRef = useRef(userInteracted);
     const isAtBottomRef = useRef(isAtBottom);
     const { toast } = useToast();
+
+    const onCopy = () => {
+      if (isCopied) return
+      copyToClipboard("Copied to clipboard")
+    }
 
     const scrollToBottom = useCallback((instant = false, isUser = false) => {
       if (isUser) {
@@ -405,7 +414,8 @@ useEffect(() => {
                               </div>
                               <div className='relative overflow-hidden flex w-full flex-col'>
                                 <div className="hidden md:inline-block font-bold select-none capitalize">
-                                  {message.role === 'user' ? (fName) : ('Eva')}</div>
+                                  {message.role === 'user' ? (fName) : ('Eva')}
+                                  </div>
                                 <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
                                   <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
                                     {message.isPlaceholder ? (
@@ -463,6 +473,15 @@ useEffect(() => {
                                     )}
                                   </div>
                                 </div>
+                                {/* <Button
+                                  variant="ghost"
+                                  className={`${message.role === 'user' ? 'place-content-end' : ''} px-3 py-1.5`}
+                                  onClick={onCopy}
+                                >
+                                  <div className="flex items-center space-x-1.5 text-white">
+                                    {isCopied ? <IconCheck /> : <IconCopy />}
+                                  </div>
+                                </Button> */}
                               </div>
                             </div>
                           </div>

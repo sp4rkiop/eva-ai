@@ -105,7 +105,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
             className="hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
             onClick={toggleLineNumbers}
           >
-            <div className="flex items-center space-x-1.5">
+            <div className="flex items-center space-x-1.5 text-white">
               {showLineNumbers ? <IconClose /> : <IconMenu />}
               <span className="hidden md:block text-xs">{showLineNumbers ? 'Hide Lines' : 'Show Lines'}</span>
             </div>
@@ -116,7 +116,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
             className="hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
             onClick={downloadAsFile}
           >
-            <div className="flex items-center space-x-1.5">
+            <div className="flex items-center space-x-1.5 text-white">
               <IconDownload />
               <span className="hidden md:block text-xs">Download</span>
             </div>
@@ -127,7 +127,7 @@ const CodeBlock: FC<Props> = memo(({ language, value }) => {
             className="text-xs hover:bg-zinc-800 focus-visible:ring-1 focus-visible:ring-slate-700 focus-visible:ring-offset-0 px-3 py-1.5"
             onClick={onCopy}
           >
-            <div className="flex items-center space-x-1.5">
+            <div className="flex items-center space-x-1.5 text-white">
               {isCopied ? <IconCheck /> : <IconCopy />}
               <span className="hidden md:block text-xs">{isCopied ? 'Copied' : 'Copy'}</span>
             </div>
