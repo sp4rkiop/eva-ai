@@ -201,10 +201,10 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     today.setHours(0, 0, 0, 0); // Midnight today
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const lastSevenDays = new Date(today);
+    lastSevenDays.setDate(lastSevenDays.getDate() - 7);
+    const lastThirtyDays = new Date(today);
+    lastThirtyDays.setDate(lastThirtyDays.getDate() - 30);
   
     const groups: { [key: string]: ChatTitle[] } = {};
   
@@ -217,12 +217,12 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       } else if (lastActivity >= yesterday) {
         if (!groups['Yesterday']) groups['Yesterday'] = [];
         groups['Yesterday'].push(chat);
-      } else if (lastActivity >= sevenDaysAgo) {
-        if (!groups['7 Days Ago']) groups['7 Days Ago'] = [];
-        groups['7 Days Ago'].push(chat);
-      } else if (lastActivity >= thirtyDaysAgo) {
-        if (!groups['30 Days Ago']) groups['30 Days Ago'] = [];
-        groups['30 Days Ago'].push(chat);
+      } else if (lastActivity >= lastSevenDays) {
+        if (!groups['Last 7 Days']) groups['Last 7 Days'] = [];
+        groups['Last 7 Days'].push(chat);
+      } else if (lastActivity >= lastThirtyDays) {
+        if (!groups['Last 30 Days']) groups['Last 30 Days'] = [];
+        groups['Last 30 Days'].push(chat);
       } else {
         const year = lastActivity.getFullYear().toString();
         if (!groups[year]) groups[year] = [];
@@ -238,7 +238,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   const groupedChats = groupChatsByDate(chatsToDisplay);
   const sortedGroups = Object.entries(groupedChats)
   .sort(([a], [b]) => {
-    const categoryOrder = ['Today', 'Yesterday', '7 Days Ago', '30 Days Ago'];
+    const categoryOrder = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days'];
     const aIsYear = !isNaN(Number(a));
     const bIsYear = !isNaN(Number(b));
     
