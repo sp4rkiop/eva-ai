@@ -19,9 +19,7 @@ import rehypeKatex from 'rehype-katex';
 import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
 import { authenticateUser } from '@/lib/utils';
-import { IconCheck, IconCopy } from './ui/icons';
-import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard'
-import { Button } from './ui/button';
+import { MessageActions } from './message-actions';
 
 interface ChatProps {
     chatId?: string;
@@ -41,9 +39,7 @@ interface Message {
   isPlaceholder?: boolean;
 }
 
-
 const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uImg, partner, userid, back_auth}) => {
-    const { isCopied, copyToClipboard } = useCopyToClipboard({ timeout: 2000 })  
     const { data: session, status, update } = useSession();
     const [messages, setMessages] = useState<Message[]>([]);
     const [currentChatId, setCurrentChatId] = useState<string | undefined>(chatId);
@@ -57,16 +53,13 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
     const isAtBottomRef = useRef(isAtBottom);
     const { toast } = useToast();
 
-    const onCopy = () => {
-      if (isCopied) return
-      copyToClipboard("Copied to clipboard")
-    }
+    // Add hover state for message actions
+    const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null);
 
     const scrollToBottom = useCallback((instant = false, isUser = false) => {
       if (isUser) {
         setUserInteracted(false);
       }
-
       if (chatContainerRef.current) {
         chatContainerRef.current.scrollTo({
           top: chatContainerRef.current.scrollHeight,
@@ -74,6 +67,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
         });
       }
     }, []);
+
     const getuId_token = async () => {
         try {
           const userData = {
@@ -97,6 +91,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             throw new Error(error instanceof Error ? error.message : "There was a problem verifying your account.");
         }
     };
+
     const handleMessageSubmit = async (text: string) => {
         try {
             // Add user's input text as a message in the current chat
@@ -112,7 +107,6 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                 isPlaceholder: true
             };
             setMessages((prevMessages) => [...prevMessages, placeholderMessage]);
-
             setAssistantTyping(true);
             
             var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/ai_request`, {
@@ -172,8 +166,8 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             // console.error('Error:', error);
         }
     };
+
     const SkeletonLoader = () => (
-      
         <div className="mt-1 flex flex-col space-y-2 animate-pulse w-fit md:w-[calc(100%-2rem)]">
             <div className="flex items-center w-full">
                 <div className="h-2.5 bg-gray-200 rounded-full dark:bg-gray-700 w-40"></div>
@@ -191,8 +185,8 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
                 <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
             </div>
         </div>
-
     );
+
     const handleNewChat = () => {
       setMessages([]);
       setIsAtBottom(true);
@@ -200,6 +194,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
       setCurrentChatId(undefined);
       setAssistantTyping(false);
     };
+
     const handleOldChat = async (iD?: string) => {
       if(currentChatId !== iD) {
         setMessages([]);
@@ -254,7 +249,6 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
         setloadingConversaion(false);
       }
     }
-
     const subscription = chatService.msgs$.subscribe((msgs) => {
       if(currentChatId!==undefined) {
         if (msgs && msgs[currentChatId]) {
@@ -297,11 +291,9 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
           }
       }
     });
-
     const endStreamSub = chatService.endStream$.subscribe(() => {
       setAssistantTyping(false);
     })
-
     return () => {
       subscription.unsubscribe();
       endStreamSub.unsubscribe(); 
@@ -319,17 +311,14 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
   useEffect(() => {
     const container = chatContainerRef.current;
     if (!container) return;
-
     let scrollCause: 'user' | 'system' | null = null;
     let lastUserInteractionTime = 0;
     const SCROLL_ORIGIN_THRESHOLD = 100; // ms
-
     // Detect potential user scroll initiations
     const handlePotentialUserScroll = () => {
         scrollCause = 'user';
         lastUserInteractionTime = Date.now();
     };
-
     // Unified hardware input listeners
     const hardwareEvents = ['pointerdown', 'wheel', 'keydown'];
     hardwareEvents.forEach(event => {
@@ -338,7 +327,6 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
             capture: true
         });
     });
-
     // Main scroll handler
     const handleScroll = () => {
         // Update bottom detection
@@ -350,19 +338,15 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
           setIsAtBottom(atBottom);
           if (atBottom) setUserInteracted(false);
         }
-
         const isRecentUserScroll = Date.now() - lastUserInteractionTime < SCROLL_ORIGIN_THRESHOLD;
         
         if (scrollCause === 'user' && isRecentUserScroll && !userInteractedRef.current) {
             setUserInteracted(true);
         }
-
         // Reset scroll origin detection
         scrollCause = null;
     };
-
     container.addEventListener('scroll', handleScroll, { passive: true });
-
     return () => {
         hardwareEvents.forEach(event => {
             container.removeEventListener(event, handlePotentialUserScroll);
@@ -397,7 +381,7 @@ useEffect(() => {
                     <div className="translateZ(0px)">
                       {(messages.length > 0) &&
                         (messages.map((message, index) => (
-                          <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 mb-8 `}>
+                          <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 md:mb-6 `}>
                             <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
                               <div className="hidden flex-shrink-0 md:flex flex-col relative items-end">
                                 <div>
@@ -412,10 +396,14 @@ useEffect(() => {
                                   </div>
                                 </div>
                               </div>
-                              <div className='relative overflow-hidden flex w-full flex-col'>
+                              <div 
+                                className='relative overflow-hidden flex w-full flex-col'
+                                onPointerEnter={() => message.role === 'user' && setHoveredMessageIndex(index)} //support hover for both mouse and touch inputs
+                                onMouseLeave={() => message.role === 'user' && setHoveredMessageIndex(null)}
+                              >
                                 <div className="hidden md:inline-block font-bold select-none capitalize">
                                   {message.role === 'user' ? (fName) : ('Eva')}
-                                  </div>
+                                </div>
                                 <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
                                   <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
                                     {message.isPlaceholder ? (
@@ -473,15 +461,33 @@ useEffect(() => {
                                     )}
                                   </div>
                                 </div>
-                                {/* <Button
-                                  variant="ghost"
-                                  className={`${message.role === 'user' ? 'place-content-end' : ''} px-3 py-1.5`}
-                                  onClick={onCopy}
-                                >
-                                  <div className="flex items-center space-x-1.5 text-white">
-                                    {isCopied ? <IconCheck /> : <IconCopy />}
-                                  </div>
-                                </Button> */}
+                                {/* MessageActions with conditional visibility */}
+                                {message.role === 'user' ? (
+                                  // Show only on hover for user messages
+                                  hoveredMessageIndex === index ?
+                                    <MessageActions 
+                                      role={message.role}
+                                      content={message.text}
+                                      conversationId={currentChatId}
+                                      index={index}
+                                      className="chat-title-enter-active"
+                                    /> : <MessageActions 
+                                      role={message.role}
+                                      content={message.text}
+                                      conversationId={currentChatId}
+                                      index={index}
+                                      className="chat-title-exit-active"
+                                    /> 
+                                ) : (
+                                  // Always show for assistant messages
+                                  <MessageActions 
+                                    role={message.role}
+                                    content={message.text}
+                                    conversationId={currentChatId}
+                                    index={index}
+                                    className={isAssistantTyping && message.role === 'assistant' && index === messages.length - 1 ? 'hidden' : ''}
+                                  />
+                                )}
                               </div>
                             </div>
                           </div>
