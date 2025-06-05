@@ -1,10 +1,18 @@
 from fastapi import HTTPException
-import uuid, jwt, logging, pickle, asyncio
+import uuid, jwt, json, logging, pickle, asyncio
 from pydantic import EmailStr
-from core.database import CassandraDatabase
+from sqlalchemy import update
+from core.database import PostgreSQLDatabase
 from core.config import settings
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta, timezone
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
+from models.users_model import Users
+from models.chat_history_model import ChatHistory
+from models.ai_models_model import AiModels
+from models.subscriptions_model import Subscriptions
 from repositories.cache_repository import CacheRepository
 
 # Configure logging
@@ -28,48 +36,79 @@ class UserService:
         Returns:
             Dictionary containing user ID and JWT token
         """
-        logger.info(f"Getting or creating user for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-        def _sync_db_work():
-            with CassandraDatabase().get_session() as session:
-                # Attempt to fetch the user
-                user_select_statement = "SELECT userid, role FROM users WHERE email = %s AND partner = %s LIMIT 1"
-                user_row = session.execute(user_select_statement, (email_id, partner)).one()
+        logger.info(f"Getting or creating user for email: {email_id}, partner: {partner}")
+        async with PostgreSQLDatabase.get_session() as session:
+            try:
+                # Try to get existing user
+                stmt = select(Users).where(
+                    Users.email == email_id,
+                    Users.partner == partner
+                )
+                result = await session.execute(stmt)
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    token = self._generate_jwt_token(user.user_id, user.role)
+                    return {
+                        "user_id": user.user_id,
+                        "token": token
+                    }
+                
+                # Create new user if not exists
+                new_user = Users(
+                    email=email_id,
+                    partner=partner,
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                session.add(new_user)
+                await session.flush()  # Flush to get generated userid
+                
+                # Add default subscription
+                default_model_id = uuid.UUID(settings.DEFAULT_MODEL_ID)
+                new_sub = Subscriptions(
+                    user_id=new_user.user_id,
+                    model_id=default_model_id
+                )
+                session.add(new_sub)
 
-                if user_row is None:
-                    logger.info(f"User not found for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}. Creating a new user.")
-                    # User doesn't exist, create a new one
-                    user_id = uuid.uuid4()
-                    default_role = "user"
-                    user_insert_statement = "INSERT INTO users (userid, role, firstname, lastname, email, partner) VALUES (%s, %s, %s, %s, %s, %s) IF NOT EXISTS"
-                    applied_info = session.execute(user_insert_statement, 
-                                                        (user_id, default_role, first_name, last_name, email_id, partner)).one()
-
-                    if applied_info and applied_info.applied:
-                        # Create a default entry for UserSubscriptions
-                        default_model_id = uuid.UUID(settings.DEFAULT_MODEL_ID)
-                        subscription_insert_statement = "INSERT INTO usersubscriptions (userid, modelid) VALUES (%s, %s) IF NOT EXISTS"
-                        session.execute(subscription_insert_statement, (user_id, default_model_id))
-                        logger.info(f"New user created for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-                        return {"user_id": user_id, "token": self._generate_jwt_token(user_id, default_role)}
-                    else:
-                        logger.info(f"User already exists for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-                        # If the insert was not applied, it means the user was created by another request
-                        user_row = session.execute(user_select_statement, (email_id, partner)).one()
-
-                if user_row:
-                    logger.info(f"User found for email: {email_id}, first name: {first_name}, last name: {last_name}, partner: {partner}")
-                    return {"user_id": user_row.userid, "token": self._generate_jwt_token(user_row.userid, user_row.role)}
-                else:
-                    raise RuntimeError("Failed to create or retrieve user.")
-        try:
-            user_data = await asyncio.to_thread(_sync_db_work)
-            return {
-                "user_id": user_data["user_id"],
-                "token": user_data["token"]
-            }
-        except Exception as e:
-            logger.exception(f"Failed to get or create user: {str(e)}")
-            raise Exception(str(e))
+                token = self._generate_jwt_token(new_user.user_id, new_user.role)
+                # Build response before commit to include all data
+                response = {
+                    "user_id": new_user.user_id,
+                    "token": token
+                }
+                await session.commit()
+                
+                logger.info(f"New user created for email: {email_id}, partner: {partner}")
+                return response
+                
+            except IntegrityError as ex:
+                # Handle race condition where user was created by another request
+                await session.rollback()
+                
+                # Retry fetching the user
+                result = await session.execute(select(Users).where(
+                    Users.email == email_id,
+                    Users.partner == partner
+                ))
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    token = self._generate_jwt_token(user.user_id, user.role)
+                    return {
+                        "user_id": user.user_id,
+                        "token": token
+                    }
+                
+                # If still not found, re-raise the original exception
+                logger.error(f"Failed to create user due to database constraints: {ex}")
+                raise ValueError("Failed to create user due to database constraints") from ex
+                
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"User operation failed: {e}")
+                raise RuntimeError("User operation failed") from e
 
 
     @staticmethod
@@ -102,22 +141,26 @@ class UserService:
         Returns:
             List of conversations or empty list
         """
-        def _sync_db_work():
-            with CassandraDatabase().get_session() as session:
-                # Prepare and execute the CQL query to fetch chat history
-                chat_select_statement = "SELECT chatid, chattitle, createdon FROM chathistory_by_visible WHERE visible = true AND userid = %s"
-                result_set = session.execute(chat_select_statement, (user_id,))
-                return [
-                    {
-                        "id": row.chatid,
-                        "title": row.chattitle,
-                        "last_activity": row.createdon
-                    }
-                    for row in result_set
-                ]
         try:
-            chat_titles = await asyncio.to_thread(_sync_db_work)
-            return chat_titles
+            async with PostgreSQLDatabase.get_session() as session:
+                # Query chat history
+                stmt = (
+                    select(ChatHistory)
+                    .where(ChatHistory.user_id == user_id)
+                    .where(ChatHistory.visible == True)
+                )
+                result = await session.execute(stmt)
+                conversations = result.scalars().all()
+                return list(
+                    map(
+                        lambda conversation: {
+                            "id": conversation.chat_id,
+                            "title": conversation.chat_title,
+                            "last_activity": conversation.last_updated
+                        },
+                        conversations
+                    )
+                )
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get conversations: {str(ex)}")
@@ -134,22 +177,25 @@ class UserService:
         Returns:
             Conversation or blank if not found
         """
-        def _sync_db_fetch():
-            with CassandraDatabase().get_session() as session:
-                # Prepare and execute the CQL query to fetch chat history
-                query = "SELECT chathistoryjson, nettokenconsumption FROM chathistory_by_visible WHERE visible = true AND userid = %s AND chatid = %s LIMIT 1"
-                row = session.execute(query, (user_id, chat_id)).one()
-                if not row:
-                    return None
-                return {
-                    "conversation": pickle.loads(row.chathistoryjson),
-                    "token_consumed": row.nettokenconsumption
-                }
         try:
-            result = await asyncio.to_thread(_sync_db_fetch)
-            if not result:
-                raise HTTPException(status_code=404, detail="Conversation not found")
-            return result
+            async with PostgreSQLDatabase.get_session() as session:
+                # Query chat history
+                stmt = (
+                    select(ChatHistory)
+                    .where(
+                        (ChatHistory.user_id == user_id) &
+                        (ChatHistory.chat_id == chat_id) &
+                        (ChatHistory.visible == True)
+                    )
+                )
+                result = await session.execute(stmt)
+                chat = result.scalar_one_or_none()
+                if not chat:
+                    raise HTTPException(status_code=404, detail="Conversation not found")
+                return {
+                    "conversation": pickle.loads(chat.history_blob) if chat.history_blob else [],
+                    "token_consumed": chat.token_count
+                }
         except HTTPException:
             raise
         except Exception as ex:
@@ -167,33 +213,25 @@ class UserService:
         Returns:
             List of subscribed models or empty list
         """
-        def _sync_db_fetch():
-            with CassandraDatabase().get_session() as session:
-                # First query to get model IDs from usersubscriptions
-                model_select_statement = "SELECT modelid FROM usersubscriptions WHERE userid = %s"
-                result_set = session.execute(model_select_statement, (user_id,))
+        try:
+            async with PostgreSQLDatabase.get_session() as session:
+                # Query subscriptions with joined model details
+                stmt = (
+                    select(Subscriptions)
+                    .options(selectinload(Subscriptions.ai_models))
+                    .where(Subscriptions.user_id == user_id)
+                )
+                result = await session.execute(stmt)
+                subscriptions = result.scalars().all()
 
-                model_ids = [row.modelid for row in result_set]
-                if not model_ids:
-                    return []
-                
-                # Create query with placeholders for the IN clause
-                placeholders = ','.join(['%s'] * len(model_ids))
-                deployment_name_select_statement = f"SELECT deploymentid, modelname FROM availablemodels WHERE deploymentid IN ({placeholders}) AND isactive = true"
-
-                # Execute the query with model_ids as parameters
-                deployment_name_result_set = session.execute(deployment_name_select_statement, model_ids)
-
-                # Process the result and return the list of models
+                # Extract model details from relationships
                 return [
                     {
-                        "id": row.deploymentid,
-                        "name": row.modelname
+                        "id": sub.ai_models.model_id,
+                        "name": sub.ai_models.deployment_name
                     }
-                    for row in deployment_name_result_set
+                    for sub in subscriptions
                 ]
-        try:
-            return await asyncio.to_thread(_sync_db_fetch)
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get subscribed models: {str(ex)}")
@@ -214,18 +252,23 @@ class UserService:
         try:
             model_sub = CacheRepository.get(cache_key)
             if model_sub is not None:
-                logger.info(f"Model {model_id} is subscribed for user {user_id}")
                 return model_sub
-            def _sync_check():
-                with CassandraDatabase().get_session() as session:
-                    model_select_statement = "SELECT modelid FROM usersubscriptions WHERE userid = %s AND modelid = %s LIMIT 1"
-                    result = session.execute(model_select_statement, (user_id, model_id)).one()
-                    return result is not None
-            
-            is_subscribed = await asyncio.to_thread(_sync_check)
+            async with PostgreSQLDatabase.get_session() as session:
+                # Query subscriptions with joined model details
+                stmt = (
+                    select(Subscriptions)
+                    .join(Subscriptions.ai_models)
+                    .where(AiModels.model_id == model_id,
+                           Subscriptions.user_id == user_id,
+                           AiModels.is_active == True)
+                )
+                result = await session.execute(stmt)
+                subscriptions = result.scalars().all()
+
+                # Extract model details from relationships
+                is_subscribed = len(subscriptions) > 0
             if is_subscribed:
                 CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
-                logger.info(f"Model {model_id} is subscribed for user {user_id}")
             return is_subscribed
         except Exception as e:
             logger.error(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
@@ -244,18 +287,19 @@ class UserService:
             True if successful, False otherwise
         """
         try:
-            def _sync_rename():
-                with CassandraDatabase().get_session() as session:
-                    chat_update_statement = "UPDATE chathistory SET chattitle = %s WHERE userid = %s AND chatid = %s IF EXISTS"
-                    saved = session.execute(chat_update_statement, (new_title, user_id, chat_id))
-                    return saved and saved[0].applied
-            
-            success = await asyncio.to_thread(_sync_rename)
-            if success:
-                logger.info(f"Renamed conversation {chat_id} for user {user_id}")
-            else:
-                logger.warning(f"Rename failed for conversation {chat_id} for user {user_id}")
-            return success
+            async with PostgreSQLDatabase.get_session() as session:
+                update_stmt = (
+                    update(ChatHistory)
+                    .where(
+                        ChatHistory.chat_id == chat_id,
+                        ChatHistory.user_id == user_id
+                    )
+                    .values(chat_title=new_title)
+                )
+                result = await session.execute(update_stmt)
+
+                # Return True if exactly 1 row was affected
+                return result.rowcount == 1
         
         except Exception as ex:
             logger.error(f"Failed to rename conversation: {str(ex)}")
@@ -273,18 +317,19 @@ class UserService:
             True if successful, False otherwise
         """
         try:
-            def _sync_delete():
-                with CassandraDatabase().get_session() as session:
-                    chat_delete_statement = "UPDATE chathistory SET visible = false WHERE userid = %s AND chatid = %s IF visible = true"
-                    saved = session.execute(chat_delete_statement, (user_id, chat_id))
-                    return saved and saved[0].applied
-                
-            success = await asyncio.to_thread(_sync_delete)
-            if success:
-                logger.info(f"Soft-deleted chat {chat_id} for user {user_id}")
-            else:
-                logger.warning(f"Soft-delete failed for chat {chat_id} for user {user_id}")
-            return success
+            async with PostgreSQLDatabase.get_session() as session:
+                update_stmt = (
+                    update(ChatHistory)
+                    .where(
+                        ChatHistory.chat_id == chat_id,
+                        ChatHistory.user_id == user_id
+                    )
+                    .values(visible=False)
+                )
+                result = await session.execute(update_stmt)
+
+                # Return True if exactly 1 row was affected
+                return result.rowcount == 1
         
         except Exception as ex:
             logger.error(f"Failed to delete conversation: {str(ex)}")

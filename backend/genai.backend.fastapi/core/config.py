@@ -12,9 +12,11 @@ class Settings(BaseSettings):
     RATE_LIMIT_USER: int = 14
     RATE_LIMIT_ANONYMOUS: int = 5
     SYSTEM_PROMPT: str = "You are eva, a helpful assistant."
-    SCYLLA_KEYSPACE: str = "eva"
-    SCYLLA_HOST: str = "127.0.0.1"
-    SCYLLA_PORT: int = 9042
+    POSTGRES_USER: str = "dev_user"
+    POSTGRES_PASSWORD: str = "dev_password"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+    POSTGRES_DB: str = "postgres"
     OPENROUTER_URI: str = "https://openrouter.ai/api/v1"
     OPENROUTER_TOKEN: str = "YOUR_OPENROUTER_TOKEN"
     AZURE_OPENAI_API_VERSION: str = "2024-10-21"

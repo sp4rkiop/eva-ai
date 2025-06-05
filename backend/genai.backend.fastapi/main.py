@@ -2,7 +2,7 @@ import uuid
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
-from core.database import CassandraDatabase
+from core.database import PostgreSQLDatabase
 from core.curl_cffi_session_manager import CurlCFFISession
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -14,7 +14,7 @@ from api.v1.endpoints import user, chat
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- startup ---
-    CassandraDatabase.initialize()
+    await PostgreSQLDatabase.initialize()
     CurlCFFISession.initialize()
     await ModelData.get_all_models()
     scheduler = AsyncIOScheduler()
@@ -22,7 +22,7 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     yield
     # --- shutdown ---
-    CassandraDatabase.close_all_connections()
+    await PostgreSQLDatabase.close_all_connections()
     CurlCFFISession.close_session()
     scheduler.shutdown()
 

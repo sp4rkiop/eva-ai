@@ -9,7 +9,8 @@ Levenshtein
 pydantic-settings
 pydantic[email]
 pyjwt
-scylla-driver
+asyncpg
+sqlalchemy[asyncio]
 uvicorn[standard]
 websockets
 apscheduler

@@ -1,18 +1,29 @@
 from typing import Any, Dict, Optional
-from fastapi import Header, HTTPException, WebSocket
+from fastapi import Depends, HTTPException, WebSocket
 from datetime import datetime, timezone
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import decode, PyJWTError
 from core.config import settings
 
-async def get_current_user(authorization: str = Header(None)):
-    if not authorization:
-        raise HTTPException(status_code=401)
+security = HTTPBearer()
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Retrieve the current user from the JWT token provided in the Authorization header.
+
+    Args:
+        credentials: HTTPAuthorizationCredentials object containing the JWT token.
+
+    Returns:
+        A dictionary containing the decoded JWT payload if the token is valid.
+
+    Raises:
+        HTTPException: If the token is invalid or the authorization header format is incorrect.
+    """
+    token = credentials.credentials
 
     # Split the header to extract the token part
     try:
-        scheme, token = authorization.split()
-        if scheme.lower() != 'bearer':
-            raise HTTPException(status_code=401, detail="Invalid authentication scheme")
         return await verify_jwt_token(token)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid authorization header format")

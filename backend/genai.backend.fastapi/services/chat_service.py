@@ -1,10 +1,12 @@
 import uuid, pickle, logging, re, asyncio
 from pydantic import SecretStr
-from core.database import CassandraDatabase
+from sqlalchemy import update
+from core.database import PostgreSQLDatabase
 from core.config import settings
 from typing import Dict, Any, List, Optional, Sequence
 from datetime import datetime, timezone
-from models.generative_model import GenerativeModel
+from models.ai_models_model import AiModels
+from models.chat_history_model import ChatHistory
 from models.response_model import ChatResponse
 from repositories.cache_repository import CacheRepository
 from repositories.websocket_manager import ws_manager
@@ -108,9 +110,9 @@ class ChatService:
                 )
                 return ChatResponse(success=False, error_message="Model is not subscribed")
             else:
-                available_models: List[GenerativeModel] = await ModelData.get_all_models()
+                available_models: List[AiModels] = await ModelData.get_all_models()
                 # Find the requested model from the list
-                selected_model = next((m for m in available_models if m.deployment_id == model_id and m.is_active), None)
+                selected_model = next((m for m in available_models if m.model_id == model_id and m.is_active), None)
                 if selected_model is None:
                     await self.send_failed_socket_message(
                         user_id, 
@@ -130,7 +132,7 @@ class ChatService:
             )
             return ChatResponse(success=False, error_message= "Server handling error: " + str(e))
 
-    def get_llm_from_model(self, model: GenerativeModel) -> AzureChatOpenAI:
+    def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:
         """
         Initializes and returns an AzureChatOpenAI instance using the model's details.
         """
@@ -207,7 +209,7 @@ class ChatService:
             )
             await asyncio.sleep(0.015)  # 15ms delay
 
-    async def lanchain_chat(self, user_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[str]:
+    async def lanchain_chat(self, user_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[uuid.UUID]:
         """
         Handles a single chat message from a user.
 
@@ -227,7 +229,6 @@ class ChatService:
 
         try:
             if not chat_id:
-                chat_id = uuid.uuid4()
                 await self.process_input(user_id, str(user_id), user_input, branch)
                 token_uses = 0
                 chat_title = await self.generate_chat_title(user_input)
@@ -235,20 +236,26 @@ class ChatService:
                 if hasattr(last_message, 'usage_metadata'):
                     token_uses = last_message.usage_metadata.get('total_tokens', 0)
                 total_tokens = chat_title['token_uses'] + token_uses
-                chat_blob = pickle.dumps(self.store)
-                def _save_new_chat():
-                    with CassandraDatabase.get_session() as session:
-                        chat_insert_statement = "INSERT INTO chathistory (userid, chatid, chattitle, chathistoryjson, createdon, nettokenconsumption, visible) VALUES (%s, %s, %s, %s, %s, %s, %s)"
-                        return session.execute(chat_insert_statement, (user_id, chat_id, chat_title['content'], chat_blob, datetime.now(timezone.utc), total_tokens, True))
-                chat_saved = await asyncio.to_thread(_save_new_chat)
-                if not chat_saved or not getattr(chat_saved[0], 'applied', True):
-                    logger.info(f"Failed to save chat with chat_id: {chat_id} for user: {user_id}")
+
+                async with PostgreSQLDatabase.get_session() as session:
+                    new_chat = ChatHistory(
+                        user_id=user_id,
+                        history_blob = pickle.dumps(self.store),
+                        chat_title = chat_title['content'],
+                        token_count = total_tokens
+
+                    )
+                    session.add(new_chat)
+                    await session.flush()
+                    chat_id = new_chat.chat_id
+                    await session.commit()
+
                 await ws_manager.send_to_user(
                     sid=user_id, 
                     message_type="EndStream", 
                     data=""
                 )
-                return str(chat_id)
+                return chat_id
             else:
                 chat_history_data = await self.user_service.get_single_conversation(user_id, chat_id)
                 self.store = chat_history_data['conversation']
@@ -257,15 +264,20 @@ class ChatService:
                 last_message = self.store[branch].messages[-1]
                 if hasattr(last_message, 'usage_metadata'):
                     token_used += last_message.usage_metadata.get('total_tokens', 0)
-                updated_blob = pickle.dumps(self.store)
 
-                def _update_existing_chat():
-                    with CassandraDatabase.get_session() as session:
-                        chat_update_statement = "UPDATE chathistory SET chathistoryjson = %s, createdon = %s, nettokenconsumption = %s WHERE userid = %s AND chatid = %s"
-                        return session.execute(chat_update_statement, (updated_blob, datetime.now(timezone.utc), token_used, user_id, chat_id))
-                chat_saved = await asyncio.to_thread(_update_existing_chat)
-                if not chat_saved or not getattr(chat_saved[0], 'applied', True):
-                    logger.info(f"Failed to update chat with chat_id: {chat_id} for user: {user_id}")
+                async with PostgreSQLDatabase.get_session() as session:
+                    update_chat = (
+                        update(ChatHistory)
+                        .where(
+                            ChatHistory.chat_id == chat_id,
+                            ChatHistory.user_id == user_id
+                        )
+                        .values(
+                            history_blob = pickle.dumps(self.store),
+                            token_count = token_used
+                        )
+                    )
+                    await session.execute(update_chat)
                 await ws_manager.send_to_user(
                     sid=user_id, 
                     message_type="EndStream", 
