@@ -3,7 +3,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.database import PostgreSQLDatabase
-from core.curl_cffi_session_manager import CurlCFFISession
+from core.curl_cffi_session_manager import CurlCFFIAsyncSession
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from repositories.websocket_manager import ws_manager
@@ -15,7 +15,7 @@ from api.v1.endpoints import user, chat
 async def lifespan(app: FastAPI):
     # --- startup ---
     await PostgreSQLDatabase.initialize()
-    CurlCFFISession.initialize()
+    await CurlCFFIAsyncSession.initialize()
     await ModelData.get_all_models()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(scheduled_data_fetch,"interval",seconds = 86400) # 86400 seconds = every 24 hours
@@ -23,7 +23,7 @@ async def lifespan(app: FastAPI):
     yield
     # --- shutdown ---
     await PostgreSQLDatabase.close_all_connections()
-    CurlCFFISession.close_session()
+    await CurlCFFIAsyncSession.close_session()
     scheduler.shutdown()
 
 async def scheduled_data_fetch():
