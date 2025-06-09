@@ -102,12 +102,12 @@ class UserService:
                     }
                 
                 # If still not found, re-raise the original exception
-                logger.error(f"Failed to create user due to database constraints: {ex}")
+                logger.error(f"Failed to create user due to database constraints: {ex}", exc_info=True)
                 raise ValueError("Failed to create user due to database constraints") from ex
                 
             except Exception as e:
                 await session.rollback()
-                logger.error(f"User operation failed: {e}")
+                logger.exception(f"User operation failed: {e}", exc_info=True)
                 raise RuntimeError("User operation failed") from e
 
 
@@ -163,7 +163,7 @@ class UserService:
                 )
         except Exception as ex:
             # Log the exception
-            logger.error(f"Failed to get conversations: {str(ex)}")
+            logger.exception(f"Failed to get conversations: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to get conversations: {str(ex)}")
         
     async def get_single_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID) -> Dict[str, Any]:
@@ -200,8 +200,8 @@ class UserService:
             raise
         except Exception as ex:
             # Log the exception
-            logger.error(f"Failed to get conversation: {str(ex)}")
-            raise Exception(f"Failed to get conversation: {str(ex)}")
+            logger.exception(f"Failed to get conversation: {str(ex)}", exc_info=True)
+            raise Exception(f"Failed to get conversation: {str(ex)}") from ex
 
     async def get_subscribed_models(self, user_id: uuid.UUID) -> List[Dict[str, Any]]:
         """
@@ -234,7 +234,7 @@ class UserService:
                 ]
         except Exception as ex:
             # Log the exception
-            logger.error(f"Failed to get subscribed models: {str(ex)}")
+            logger.exception(f"Failed to get subscribed models: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to get subscribed models: {str(ex)}")
     
     async def is_model_subscribed(self, user_id: uuid.UUID, model_id: uuid.UUID) -> bool:
@@ -271,7 +271,7 @@ class UserService:
                 CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
             return is_subscribed
         except Exception as e:
-            logger.error(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
+            logger.exception(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}", exc_info=True)
             raise Exception(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
 
     async def rename_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID, new_title: str) -> bool:
@@ -302,7 +302,7 @@ class UserService:
                 return result.rowcount == 1
         
         except Exception as ex:
-            logger.error(f"Failed to rename conversation: {str(ex)}")
+            logger.exception(f"Failed to rename conversation: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to rename conversation: {str(ex)}")
 
     async def delete_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID) -> bool:
@@ -332,5 +332,5 @@ class UserService:
                 return result.rowcount == 1
         
         except Exception as ex:
-            logger.error(f"Failed to delete conversation: {str(ex)}")
+            logger.exception(f"Failed to delete conversation: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to delete conversation: {str(ex)}")

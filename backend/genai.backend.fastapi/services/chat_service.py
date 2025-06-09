@@ -3,91 +3,206 @@ from pydantic import SecretStr
 from sqlalchemy import update
 from core.database import PostgreSQLDatabase
 from core.config import settings
-from typing import Dict, Any, List, Optional, Sequence
-from datetime import datetime, timezone
+from typing import TypedDict, Dict, Any, List, Optional, Sequence
 from models.ai_models_model import AiModels
 from models.chat_history_model import ChatHistory
 from models.response_model import ChatResponse
-from repositories.cache_repository import CacheRepository
 from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
 from services.management_service import ModelData
 from langchain_openai import AzureChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, AIMessageChunk, ToolMessage
 from pydantic import BaseModel, Field
 from copy import deepcopy
-from langchain_core.runnables import ConfigurableFieldSpec
-from langchain_core.runnables.history import RunnableWithMessageHistory
+from langgraph.graph import StateGraph, START, END
+from langgraph.prebuilt import ToolNode, tools_condition
+from utils.langchain_tools import get_tools
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-class InMemoryHistory(BaseChatMessageHistory, BaseModel):
-    messages: list[BaseMessage] = Field(default_factory=list)
-
-    def add_messages(self, messages: Sequence[BaseMessage]) -> None:
-        self.messages.extend(messages)
-
-    def clear(self) -> None:
-        self.messages = []
-    
-    def edit_message_at_index(self, index: int, new_message: BaseMessage) -> None:
-        if 0 <= index < len(self.messages):
-            self.messages[index] = new_message
-            # Truncate all messages after the edited one
-            self.messages = self.messages[:index + 1]
-        else:
-            raise IndexError("Message index out of range.")
-        
-class ProxyHistory(BaseChatMessageHistory):
-    """
-    A proxy wrapper around an InMemoryHistory instance that limits the number of messages 
-    exposed to consumers (e.g., a language model chain), while still allowing full history 
-    to be stored and updated.
-
-    This is useful when you want to constrain the visible conversation context—such as 
-    returning only the last N messages—without losing the complete chat history.
-
-    Attributes:
-        _full_history (InMemoryHistory): The original full message history store.
-        _limit (int): The number of most recent messages to expose when accessed.
-
-    Methods:
-        messages (list[BaseMessage]):
-            Returns the last `limit` messages from the full history.
-        add_messages(messages: list[BaseMessage]):
-            Adds new messages to the full history.
-        clear():
-            Clears the entire history in the underlying store.
-    """
-    def __init__(self, full_history: InMemoryHistory, limit: int = 4):
-        self._full_history = full_history
-        self._limit = limit
-
-    @property
-    def messages(self) -> Sequence[BaseMessage]: # type: ignore
-        # Only return the last N messages
-        return self._full_history.messages[-self._limit:]
-
-    def add_messages(self, messages: Sequence[BaseMessage]) -> None:
-        # Delegate writes to the original history
-        self._full_history.add_messages(messages)
-
-    def clear(self) -> None:
-        self._full_history.clear()
-
 class ChatService:
     def __init__(self):
         self.parser = StrOutputParser()
         self.llm: AzureChatOpenAI
         self.store = {}
+        self.history_limit = 4
         self.branch = "main"
         self.user_service = UserService()
+        self.workflow = self.create_workflow()
 
+    def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:
+        """
+        Initializes and returns an AzureChatOpenAI instance using the model's details.
+        """
+        return AzureChatOpenAI(
+            azure_endpoint=model.endpoint,
+            api_key=SecretStr(model.api_key),
+            azure_deployment=model.deployment_name,
+            api_version=settings.AZURE_OPENAI_API_VERSION,
+            temperature=0.01,
+            stream_usage=True
+        )
+           
+    def get_chat_history_by_branch(self, branch: str) -> BaseChatMessageHistory:
+        if branch not in self.store:
+            self.store[branch] = InMemoryHistory()
+        return self.store[branch]
+
+    def get_valid_chat_history(self, limit: int = 4) -> List[BaseMessage]:
+        history = self.get_chat_history_by_branch(self.branch).messages[-limit:]
+        valid_messages = []
+        
+        # Filter out any ToolMessage at the start of the history, as
+        # they don't make sense in the context of a chat history.
+        if len(history) > 1 and isinstance(history[0], ToolMessage):
+            valid_messages = history[1:]
+        else:
+            valid_messages = history
+
+        return valid_messages
+
+    def create_branch_from(self, parent_branch: str, new_branch: str, edit_index: int, new_message: BaseMessage):
+        parent_history = self.store.get(parent_branch)
+        if not parent_history:
+            raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
+
+        # Clone messages up to the edit point
+        new_history = InMemoryHistory(messages=deepcopy(parent_history.messages[:edit_index]))
+        # Add the new edited message
+        new_history.add_messages([new_message])
+        # Store the new branch
+        self.store[new_branch] = new_history
+
+    def create_workflow(self):
+        # Define LangGraph nodes
+        builder = StateGraph(GraphState)
+        tools = get_tools()
+        # Node 1: Process chat input
+        async def process_chat(state: GraphState):
+            history = self.get_valid_chat_history(limit=self.history_limit)
+
+            # Create prompt based on state
+            if state["tool_used"]:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", settings.SYSTEM_PROMPT),
+                    *history
+                ])
+            else:
+                prompt = ChatPromptTemplate.from_messages([
+                    ("system", settings.SYSTEM_PROMPT),
+                    *history,
+                    HumanMessage(content=state['user_input'])
+                ])
+            
+            llm_with_tools = self.llm.bind_tools(tools)
+            chain = prompt | llm_with_tools
+            ai_message = None
+
+            # Stream response
+            async for chunk in chain.astream({}):
+                await ws_manager.send_to_user(
+                    sid=state['user_id'],
+                    message_type="StreamMessage",
+                    data={"chat_id": state['chat_id'], "content": chunk.content}
+                )
+                await asyncio.sleep(0.015) # 15ms delay to simulate real-time response
+
+                if ai_message is None:
+                    ai_message = chunk
+                else:
+                    ai_message += chunk
+
+            # Add message to history
+            if state["tool_used"]:
+                self.store[self.branch].add_messages([ai_message])
+            else: 
+                self.store[self.branch].add_messages([HumanMessage(content=state['user_input']), ai_message])
+
+            # Update token usage
+            last_message = self.store[self.branch].messages[-1]
+            if hasattr(last_message, 'usage_metadata'):
+                state['token_usage'] += last_message.usage_metadata.get('total_tokens', 0)
+
+            # Update state
+            state["messages"] = self.store[self.branch].messages
+            return state
+        
+        # Node 2: Save to database
+        async def save_to_db(state: GraphState):
+            
+            if state['new_chat']:
+                # Generate title for new chat
+                title_result = await self.generate_chat_title(state['user_input'])
+                chat_title = title_result['content']
+                # Update token usage
+                state['token_usage'] += title_result['token_uses']
+                # Save to database
+                async with PostgreSQLDatabase.get_session() as session:
+                    new_chat = ChatHistory(
+                        user_id=state['user_id'],
+                        history_blob=pickle.dumps(self.store),
+                        chat_title=chat_title,
+                        token_count=state['token_usage']
+                    )
+                    session.add(new_chat)
+                    await session.flush()
+                    state['chat_id'] = str(new_chat.chat_id)
+                    await session.commit()
+            else:
+                # Save to database
+                async with PostgreSQLDatabase.get_session() as session:
+                    update_chat = (
+                        update(ChatHistory)
+                        .where(
+                            ChatHistory.user_id == state['user_id'],
+                            ChatHistory.chat_id == uuid.UUID(state['chat_id'])
+                            )
+                        .values(
+                            history_blob=pickle.dumps(self.store),
+                            token_count=state['token_usage']
+                        )
+                    )
+                    await session.execute(update_chat)
+            
+            # Send end stream signal to subscriber
+            await ws_manager.send_to_user(
+                state['user_id'],
+                "EndStream",
+                ""
+            )
+            return state
+        
+        #Node: sync tool messages to store
+        async def sync_messages(state: GraphState):
+            # sync state['messages'] to self.store[branch]
+            self.store[self.branch].add_messages(state['messages'])
+            state["tool_used"] = True
+            return state
+        
+        # Build graph
+        builder.add_node("process_chat", process_chat)
+        builder.add_node("tools", ToolNode(tools))
+        builder.add_node("sync_messages", sync_messages)
+        builder.add_conditional_edges(
+            "process_chat",
+            tools_condition,
+            {"tools": "tools", END: "save_to_db"},
+        )
+        builder.add_node("save_to_db", save_to_db)
+
+        # Define edges
+        builder.set_entry_point("process_chat") #START
+        # Any time a tool is called, we return to the chatbot to decide the next step
+        builder.add_edge("tools", "sync_messages")
+        builder.add_edge("sync_messages", "process_chat")
+        builder.add_edge("save_to_db", END)
+        
+        return builder.compile()
+    
     async def chat_shield(self, user_id: uuid.UUID, model_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None) -> ChatResponse:
         """
         Checks if a model is subscribed by a user and runs the chat shield on the given input.
@@ -132,83 +247,6 @@ class ChatService:
             )
             return ChatResponse(success=False, error_message= "Server handling error: " + str(e))
 
-    def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:
-        """
-        Initializes and returns an AzureChatOpenAI instance using the model's details.
-        """
-        return AzureChatOpenAI(
-            azure_endpoint=model.endpoint,
-            api_key=SecretStr(model.api_key),
-            azure_deployment=model.deployment_name,
-            api_version=settings.AZURE_OPENAI_API_VERSION,
-            temperature=0.01,
-            stream_usage=True
-        )
-           
-    def get_chat_history_by_branch(self, branch: str) -> BaseChatMessageHistory:
-        if branch not in self.store:
-            self.store[branch] = InMemoryHistory()
-        return ProxyHistory(self.store[branch], limit=4)
-
-    def append_message_to_branch(self, message: BaseMessage, branch: str) -> None:
-        if branch not in self.store:
-            self.store[branch] = InMemoryHistory()
-        self.store[branch].messages.append(message)
-
-    def create_branch_from(self, parent_branch: str, new_branch: str, edit_index: int, new_message: BaseMessage):
-        parent_history = self.store.get(parent_branch)
-        if not parent_history:
-            raise ValueError(f"Parent branch '{parent_branch}' does not exist.")
-
-        # Clone messages up to the edit point
-        new_history = InMemoryHistory(messages=deepcopy(parent_history.messages[:edit_index]))
-        # Add the new edited message
-        new_history.add_messages([new_message])
-        # Store the new branch
-        self.store[new_branch] = new_history
-
-    async def process_input(self, user_id: uuid.UUID, chat_id: str, user_input: str, branch: str):
-        """
-        Process a user's input and send the response to the user's websocket.
-
-        Args:
-            user_id: User's UUID
-            chat_id: Chat UUID
-            user_input: The message content from the user
-            branch: Chat branch name
-
-        """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", settings.SYSTEM_PROMPT),
-            MessagesPlaceholder(variable_name="history"),
-            ("human", "{input}"),
-        ])
-        chain = prompt | self.llm
-        chain_with_history = RunnableWithMessageHistory(
-            chain, # type: ignore
-            get_session_history=self.get_chat_history_by_branch,
-            input_messages_key="input",
-            history_messages_key="history",
-            history_factory_config=[
-                ConfigurableFieldSpec(
-                    id="branch",
-                    annotation=str,
-                    name="Chat Branch Name",
-                    description="Unique name for the chat branch",
-                    default="",
-                    is_shared=True,
-                ),
-            ],
-        )
-        async for chunk in chain_with_history.astream({"input": user_input},
-                                                    config={"configurable": {"branch": branch}}):
-            await ws_manager.send_to_user(
-                sid=user_id, 
-                message_type="StreamMessage", 
-                data={"chat_id": chat_id, "content": chunk.content}
-            )
-            await asyncio.sleep(0.015)  # 15ms delay
-
     async def lanchain_chat(self, user_id: uuid.UUID, user_input: str, chat_id: Optional[uuid.UUID] = None, branch: str = "main") -> Optional[uuid.UUID]:
         """
         Handles a single chat message from a user.
@@ -228,64 +266,38 @@ class ChatService:
         """
 
         try:
-            if not chat_id:
-                await self.process_input(user_id, str(user_id), user_input, branch)
-                token_uses = 0
-                chat_title = await self.generate_chat_title(user_input)
-                last_message = self.store[branch].messages[-1]
-                if hasattr(last_message, 'usage_metadata'):
-                    token_uses = last_message.usage_metadata.get('total_tokens', 0)
-                total_tokens = chat_title['token_uses'] + token_uses
-
-                async with PostgreSQLDatabase.get_session() as session:
-                    new_chat = ChatHistory(
-                        user_id=user_id,
-                        history_blob = pickle.dumps(self.store),
-                        chat_title = chat_title['content'],
-                        token_count = total_tokens
-
-                    )
-                    session.add(new_chat)
-                    await session.flush()
-                    chat_id = new_chat.chat_id
-                    await session.commit()
-
-                await ws_manager.send_to_user(
-                    sid=user_id, 
-                    message_type="EndStream", 
-                    data=""
-                )
-                return chat_id
-            else:
+            self.branch = branch
+            # Initialize state
+            state = {
+                "user_id": user_id,
+                "user_input": user_input,
+                "chat_id": str(chat_id) if chat_id else None,
+                "new_chat": not chat_id,
+                "token_usage": 0,
+                "tool_used": False
+            }
+            
+            # Load existing chat history if available
+            if chat_id:
                 chat_history_data = await self.user_service.get_single_conversation(user_id, chat_id)
                 self.store = chat_history_data['conversation']
-                token_used = chat_history_data['token_consumed']
-                await self.process_input(user_id, str(chat_id), user_input, branch)
-                last_message = self.store[branch].messages[-1]
-                if hasattr(last_message, 'usage_metadata'):
-                    token_used += last_message.usage_metadata.get('total_tokens', 0)
-
-                async with PostgreSQLDatabase.get_session() as session:
-                    update_chat = (
-                        update(ChatHistory)
-                        .where(
-                            ChatHistory.chat_id == chat_id,
-                            ChatHistory.user_id == user_id
-                        )
-                        .values(
-                            history_blob = pickle.dumps(self.store),
-                            token_count = token_used
-                        )
-                    )
-                    await session.execute(update_chat)
-                await ws_manager.send_to_user(
-                    sid=user_id, 
-                    message_type="EndStream", 
-                    data=""
-                )
+                state['token_usage'] = chat_history_data['token_consumed']
+            else:
+                state['chat_id'] = str(user_id)  # Temporary ID for streaming
+            
+            # Execute workflow
+            final_state = await self.workflow.ainvoke(state)
+            
+            return uuid.UUID(final_state['chat_id'])
+            
         except Exception as e:
-            logger.error(f"Error processing chat: {e}")
-            raise Exception("Something went wrong, please wait for a while.")
+            logger.exception(f"Error processing chat: {e}", exc_info=True)
+            await self.send_failed_socket_message(
+                user_id,
+                str(chat_id) if chat_id else str(user_id),
+                f"Processing error: {str(e)}"
+            )
+            return None
 
     async def generate_chat_title(self, user_input: str) -> Dict[str, Any]:
         """
@@ -328,7 +340,7 @@ class ChatService:
             token_uses = response.response_metadata['token_usage']['total_tokens'] if response.response_metadata else 0
             return {"content": clear_output, "token_uses": token_uses}
         except Exception as e:
-            logger.error(f"Failed to generate title with error: {str(e)}")
+            logger.exception(f"Failed to generate title with error: {str(e)}", exc_info=True)
             return {"content": "Failed to generate title", "token_uses": 0}
     
     async def send_failed_socket_message(self, user_id: uuid.UUID, chat_id: str, message: str):
@@ -350,3 +362,29 @@ class ChatService:
             message_type="EndStream", 
             data=""
         )
+
+class InMemoryHistory(BaseChatMessageHistory, BaseModel):
+    messages: list[BaseMessage] = Field(default_factory=list)
+
+    def add_messages(self, messages: Sequence[BaseMessage]) -> None:
+        self.messages.extend(messages)
+
+    def clear(self) -> None:
+        self.messages = []
+    
+    def edit_message_at_index(self, index: int, new_message: BaseMessage) -> None:
+        if 0 <= index < len(self.messages):
+            self.messages[index] = new_message
+            # Truncate all messages after the edited one
+            self.messages = self.messages[:index + 1]
+        else:
+            raise IndexError("Message index out of range.")
+        
+class GraphState(TypedDict):
+    user_id: uuid.UUID
+    user_input: str
+    chat_id: Optional[str]
+    new_chat: bool
+    messages: List[BaseMessage]
+    token_usage: int
+    tool_used: bool

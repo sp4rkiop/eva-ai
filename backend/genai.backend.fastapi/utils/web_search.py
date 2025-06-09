@@ -1,12 +1,20 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import logging, re, urllib.parse, asyncio
+from pydantic import BaseModel, Field
 from curl_cffi import ProxySpec
 from bs4 import BeautifulSoup, Tag
-from difflib import SequenceMatcher
+from langchain.tools import Tool
 from core.curl_cffi_session_manager import CurlCFFIAsyncSession
+from utils.py_code_runner import python_code_runner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+class ScrapUrlListInput(BaseModel):
+    url_list: List[str] = Field(..., description="List of URLs to scrape")
+
+class SearchInput(BaseModel):
+    query: str = Field(..., description="Search query")
 
 class WebSearchService:
     def __init__(self):
@@ -28,9 +36,7 @@ class WebSearchService:
             "sec-ch-ua-platform": '"Windows"',
             "Host": "html.duckduckgo.com",
         }
-        self.proxies: ProxySpec = {
-            "http": "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt"
-        }
+        self.proxies: ProxySpec = {}
         self.search_result = []
         self.scrap_result = {}
 
@@ -78,12 +84,12 @@ class WebSearchService:
         except Exception as e:
             logger.exception(f"An error occurred while searching for {query} : {e}")
 
-    async def scrap_url_list(self, url_list: list) -> Optional[Dict[str, str]]:
+    async def scrap_url_list(self, url_list: list[str]) -> Optional[Dict[str, str]]:
         """
         Scrap a list of URLs and return a dictionary with the URL as the key and the scraped content as the value.
 
         Args:
-            url_list (list): A list of URLs to be scraped
+            url_list (list[str]): A list of URLs to be scraped
 
         Returns:
             Optional[Dict[str, str]]: A dictionary with the scraped content, or None if an error occurred
@@ -175,3 +181,4 @@ class WebSearchService:
     {chr(10).join(links)}
         """
         return markdown_output
+    
