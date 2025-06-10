@@ -1,3 +1,4 @@
+import { Console } from 'console';
 import { BehaviorSubject, Subject } from 'rxjs';
 
 export class ChatService {
@@ -6,6 +7,8 @@ export class ChatService {
 
   public msgs$ = new BehaviorSubject<any>([]);
   public msgs: { [chatId: string]: string[] } = {};
+  public toolProcess$ = new BehaviorSubject<any>([]);
+  public toolmsg: { [chatId: string]: string } = {};
   public endStream$ = new Subject<void>();
   public selectedModelId$ = new BehaviorSubject<number>(1);
   public HubConnectionState$ = new BehaviorSubject<string>('Disconnected');
@@ -74,6 +77,12 @@ export class ChatService {
 
             this.msgs[chatId].push(partialContent);
             this.msgs$.next(this.msgs);
+
+          } else if (type === "ToolProcess") {
+            this.toolmsg[data.chat_id] = data.content;
+            this.toolProcess$.next(this.toolmsg);
+            this.toolmsg = {};
+            this.toolProcess$.next(this.toolmsg);
 
           } else if (type === "EndStream") {
             setTimeout(() => {

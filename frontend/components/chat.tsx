@@ -20,6 +20,7 @@ import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
 import { authenticateUser } from '@/lib/utils';
 import { MessageActions } from './message-actions';
+import { Loader2 } from 'lucide-react';
 
 interface ChatProps {
     chatId?: string;
@@ -42,6 +43,7 @@ interface Message {
 const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uImg, partner, userid, back_auth}) => {
     const { data: session, status, update } = useSession();
     const [messages, setMessages] = useState<Message[]>([]);
+    const [toolMessage, setToolMessage] = useState<string>("");
     const [currentChatId, setCurrentChatId] = useState<string | undefined>(chatId);
     const [loadingConversaion, setloadingConversaion] = useState<boolean>(false);
     const [isAssistantTyping, setAssistantTyping] = useState<boolean>(false);
@@ -187,6 +189,15 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
         </div>
     );
 
+    const ToolMessageLoader = () => (
+        <div className="mt-1 flex items-center space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-[#2f2f2f] w-fit">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="text-sm">
+            {toolMessage}
+          </div>
+        </div>
+    );
+
     const handleNewChat = () => {
       setMessages([]);
       setIsAtBottom(true);
@@ -250,6 +261,7 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
       }
     }
     const subscription = chatService.msgs$.subscribe((msgs) => {
+      setToolMessage("");
       if(currentChatId!==undefined) {
         if (msgs && msgs[currentChatId]) {
             const newMessage: Message = {
@@ -291,11 +303,59 @@ const Chat: React.FC<ChatProps> = ({chatService,chatId, fName, lName, uMail, uIm
           }
       }
     });
+    const toolMsgSubscription = chatService.toolProcess$.subscribe((toolMsg) => {
+      if(currentChatId!==undefined) {
+        if (toolMsg && toolMsg[currentChatId]) {
+          const placeholderMessage: Message = {
+              role: 'assistant',
+              text: '',
+              isPlaceholder: true
+          };
+          setMessages((prevMessages) => {
+            // Check if the last message is from the assistant and update it
+            if (
+              prevMessages.length > 0 &&
+              prevMessages[prevMessages.length - 1].role === "assistant"
+            ) {
+              const lastMsg = prevMessages[prevMessages.length - 1];
+              return prevMessages.slice(0, -1).concat({...lastMsg, isPlaceholder: true});
+            } else {
+              // If the last message is not from the assistant, add the new message
+              return [...prevMessages, placeholderMessage];
+            }
+          });
+          setToolMessage(""); // Clear previous tool message
+          setToolMessage(toolMsg[currentChatId]);
+          }
+      }else if (toolMsg && toolMsg[userid || '']) {
+        const placeholderMessage: Message = {
+            role: 'assistant',
+            text: '',
+            isPlaceholder: true
+        };
+        setMessages((prevMessages) => {
+          // Check if the last message is from the assistant and update it
+          if (
+            prevMessages.length > 0 &&
+            prevMessages[prevMessages.length - 1].role === "assistant"
+          ) {
+            const lastMsg = prevMessages[prevMessages.length - 1];
+            return prevMessages.slice(0, -1).concat({...lastMsg, isPlaceholder: true});
+          } else {
+            // If the last message is not from the assistant, add the new message
+            return [...prevMessages, placeholderMessage];
+          }
+        });
+        setToolMessage(""); // Clear previous tool message
+        setToolMessage(toolMsg[userid || '']);
+      }
+    });
     const endStreamSub = chatService.endStream$.subscribe(() => {
       setAssistantTyping(false);
     })
     return () => {
       subscription.unsubscribe();
+      toolMsgSubscription.unsubscribe();
       endStreamSub.unsubscribe(); 
     };
   }, [currentChatId]);
@@ -406,9 +466,9 @@ useEffect(() => {
                                 </div>
                                 <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
                                   <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
-                                    {message.isPlaceholder ? (
-                                      <SkeletonLoader />
-                                    ) : (
+                                    {message.isPlaceholder ? 
+                                    ( toolMessage.length > 0 ? <ToolMessageLoader /> : <SkeletonLoader /> ) 
+                                    : (
                                       message.role === 'assistant' ? (<MemoizedReactMarkdown
                                         className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base" //pl-4
                                         remarkPlugins={[remarkGfm, remarkMath]}

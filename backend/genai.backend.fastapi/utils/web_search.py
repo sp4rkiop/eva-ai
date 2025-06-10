@@ -3,18 +3,22 @@ import logging, re, urllib.parse, asyncio
 from pydantic import BaseModel, Field
 from curl_cffi import ProxySpec
 from bs4 import BeautifulSoup, Tag
-from langchain.tools import Tool
+from typing_extensions import Annotated
+from langgraph.prebuilt import InjectedState
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from core.curl_cffi_session_manager import CurlCFFIAsyncSession
-from utils.py_code_runner import python_code_runner
+from repositories.websocket_manager import ws_manager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class ScrapUrlListInput(BaseModel):
     url_list: List[str] = Field(..., description="List of URLs to scrape")
+    state: Annotated[dict, InjectedState]
 
 class SearchInput(BaseModel):
     query: str = Field(..., description="Search query")
+    state: Annotated[dict, InjectedState]
 
 class WebSearchService:
     def __init__(self):
@@ -37,13 +41,16 @@ class WebSearchService:
             "Host": "html.duckduckgo.com",
         }
         self.proxies: ProxySpec = {}
-        self.search_result = []
-        self.scrap_result = {}
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=100,
+        )
 
-    async def search(self, query: str, latest_by: str = "", region: str = "") -> Optional[list]: #https://duckduckgo.com/duckduckgo-help-pages/settings/params
+    async def search(self, query: str, latest_by: str = "", region: str = "", state: Optional[dict] = None) -> Optional[list]: #https://duckduckgo.com/duckduckgo-help-pages/settings/params
         """
-        Perform a web search using DuckDuckGo and return a list of search results.
-        
+        Perform a web search using DuckDuckGo and return a list of search results in 
+        the format {'title': title of page, 'url': url, 'description': short description of page related to query}.
+        It can fail to return results if the request fails. So do not spam it.
         Args:
             query (str): The search query string.
             latest_by (str, optional): Filter results by recency. Use 'd' for day, 'w' for week, 'm' for month, 'y' for year.
@@ -53,6 +60,7 @@ class WebSearchService:
             Optional[list]: A list of dictionaries containing the search result's title, URL, and description, 
                             or None if the search fails.
         """
+        search_result = []
         params = {
             "q": query, #+ " site:febbox.com"
             "kl": region,
@@ -61,6 +69,12 @@ class WebSearchService:
         }
         search_url = self.baseurl + "/?" + urllib.parse.urlencode(params)
         try:
+            if state:
+                await ws_manager.send_to_user(
+                    sid=state["user_id"],
+                    message_type="ToolProcess",
+                    data={"chat_id": state["chat_id"], "content": "Searching the web..."}
+                )
             async with CurlCFFIAsyncSession.get_session() as ssn:
                 request = await ssn.get(search_url, headers=self.headers, impersonate="chrome", proxies=self.proxies) # type: ignore
                 if request.status_code == 200:
@@ -73,28 +87,43 @@ class WebSearchService:
                             url = result.find('a', {'class': 'result__url'})
                             description = result.find('a', {'class': 'result__snippet'})
                             if title and url and description:
-                                self.search_result.append({'title': title.text.strip(), 'url': url.text.strip(), 'description': description.text.strip()})
+                                search_result.append({'title': title.text.strip(), 'url': url.text.strip(), 'description': description.text.strip()})
                         else:
                             raise TypeError(f"Expected a Tag object, but got {type(result)}")
                     
-                    if self.search_result:
-                        return self.search_result
+                    if search_result:
+                        if state:
+                            await ws_manager.send_to_user(
+                                sid=state["user_id"],
+                                message_type="ToolProcess",
+                                data={"chat_id": state["chat_id"], "content": "Got few results..."}
+                            )
+                        return search_result
                 else:
                     logger.error(f"Failed to search for {query}. Status code: {request.status_code}")
+                    return [{"error": f"Failed to search for {query}. Status code: {request.status_code}. Try again later."}]
         except Exception as e:
             logger.exception(f"An error occurred while searching for {query} : {e}")
+            return [{"error": f"Try again later. An error occurred while searching for {query} : {e}."}]
 
-    async def scrap_url_list(self, url_list: list[str]) -> Optional[Dict[str, str]]:
+    async def scrap_url_list(self, url_list: list[str], state: Optional[dict] = None) -> Optional[Dict[str, list[str]]]:
         """
-        Scrap a list of URLs and return a dictionary with the URL as the key and the scraped content as the value.
-
+        Scrap a list of URLs and return a dictionary with the URL as the key and the list of relevant chunks of scraped content as the value.
+        It can fail if the URL is not valid or if the request fails. So do not spam it.
         Args:
             url_list (list[str]): A list of URLs to be scraped
 
         Returns:
             Optional[Dict[str, str]]: A dictionary with the scraped content, or None if an error occurred
         """
+        scrap_result = {}
         try:
+            if state:
+                await ws_manager.send_to_user(
+                    sid=state["user_id"],
+                    message_type="ToolProcess",
+                    data={"chat_id": state["chat_id"], "content": "Extracting content from the link..."}
+                )
             async with CurlCFFIAsyncSession.get_session() as s:
                 tasks = []
                 for url in url_list:
@@ -122,10 +151,30 @@ class WebSearchService:
                 results = await asyncio.gather(*tasks)
                 for result in results:
                     if result.status_code == 200:
-                        self.scrap_result[result.url] = self.markdown_html_content(result.text, result.url)
+                        user_query = ""
+                        if state: 
+                            user_query = state["user_input"]
+                            await ws_manager.send_to_user(
+                                sid=state["user_id"],
+                                message_type="ToolProcess",
+                                data={"chat_id": state["chat_id"], "content": f"Summarizing content from {result.url}..."}
+                            )
+                        markdown = self.markdown_html_content(result.text, result.url)
+                        chunks = self.text_splitter.split_text(markdown)
+                        if user_query:
+                            # Filter top 10 related chunks based on the user's query (simple keyword match)
+                            chunks = [chunk for chunk in chunks if any(word in chunk.lower() for word in user_query.lower().split())][:10]
+                        scrap_result[result.url] = chunks
                     else:
                         logger.error(f"Failed to scrap {result.url}. Status code: {result.status_code}")
-                return self.scrap_result 
+
+                if state:
+                    await ws_manager.send_to_user(
+                        sid=state["user_id"],
+                        message_type="ToolProcess",
+                        data={"chat_id": state["chat_id"], "content": "Extraction completed..."}
+                    )
+                return scrap_result 
         except Exception as e:
             logger.exception(f"Failed to scrap {url_list}: {e}")
 
@@ -148,6 +197,10 @@ class WebSearchService:
         
         # Parse the HTML content
         soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Remove unnecessary sections
+        for tag in soup(["script", "style", "nav", "footer", "header", "form", "aside"]):
+            tag.decompose()
         
         # Extract the title
         title = soup.title.string if soup.title else "No Title Found"
