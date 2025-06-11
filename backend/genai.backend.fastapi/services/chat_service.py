@@ -124,7 +124,7 @@ class ChatService:
 
             # Update token usage
             last_message = self.store[self.branch].messages[-1]
-            if hasattr(last_message, 'usage_metadata'):
+            if hasattr(last_message, 'usage_metadata') and last_message.usage_metadata is not None:
                 state['token_usage'] += last_message.usage_metadata.get('total_tokens', 0)
 
             # Update state
