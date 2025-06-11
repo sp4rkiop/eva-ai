@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuSubContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
@@ -27,8 +29,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ChatService } from '@/lib/service';
 import { TransitionGroup, CSSTransition } from 'react-transition-group';
-import { Search } from 'lucide-react';
+import { Ellipsis, EllipsisVertical, LogOut, Search, Settings, UserCog, UserRoundCog } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from './ui/context-menu';
+import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 interface ChatTitle {
   id: string;
   title: string;
@@ -57,7 +60,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   const { toast } = useToast()
   const [title, setTitle] = useState("");
   const fetchedRef = useRef(false);
-  
+
   // Search functionality states
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -65,6 +68,10 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
 
   // Use a Map to store refs for each chat item
   const nodeRefs = useRef(new Map());
+
+  const isMobileDevice = () => {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  };
 
   const toggleSearch = () => {
     if (showSearch) {
@@ -79,11 +86,11 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchText(value);
-    
+
     if (value.trim() === "") {
       setFilteredTitles([]);
     } else {
-      const filtered = chatTitles.filter(chat => 
+      const filtered = chatTitles.filter(chat =>
         chat.title.toLowerCase().includes(value.toLowerCase())
       );
       setFilteredTitles(filtered);
@@ -103,7 +110,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           "Authorization": `Bearer ${back_auth}`
         },
       }).then(async (res) => {
-        if(res.status === 401) {
+        if (res.status === 401) {
           toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
@@ -113,24 +120,24 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           await getuId_token();
           return handleRename(chatId, newTitle);
         } else if (res.status === 204) {
-            toast({
-              description: "Chat title updated",
-              duration: 1500
-            });
-            const updatedTitles = chatTitles.map((t) => {
-              if (t.id === chatId) {
-                return { ...t, title: newTitle };
-              }
-              return t;
-            });
-            setChatTitles(updatedTitles);
-            
-            // Update filtered titles if we're in search mode
-            if (searchText.trim() !== "") {
-              setFilteredTitles(updatedTitles.filter(chat => 
-                chat.title.toLowerCase().includes(searchText.toLowerCase())
-              ));
+          toast({
+            description: "Chat title updated",
+            duration: 1500
+          });
+          const updatedTitles = chatTitles.map((t) => {
+            if (t.id === chatId) {
+              return { ...t, title: newTitle };
             }
+            return t;
+          });
+          setChatTitles(updatedTitles);
+
+          // Update filtered titles if we're in search mode
+          if (searchText.trim() !== "") {
+            setFilteredTitles(updatedTitles.filter(chat =>
+              chat.title.toLowerCase().includes(searchText.toLowerCase())
+            ));
+          }
         } else {
           throw new Error("There was a problem renaming the chat. Code: " + res.status);
         }
@@ -145,7 +152,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       });
     }
   };
-  
+
   const handleDelete = (chatId: string) => {
     try {
       fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}`, {
@@ -156,7 +163,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         },
         body: JSON.stringify({ delete: true }),
       }).then(async (res) => {
-        if(res.status === 401) {
+        if (res.status === 401) {
           toast({
             variant: "destructive",
             title: "Uh oh! Something went wrong.",
@@ -165,23 +172,23 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           });
           await getuId_token();
           return handleDelete(chatId);
-        }else if (res.status === 204) {
+        } else if (res.status === 204) {
           toast({
             description: "Chat deleted",
             duration: 1500
           });
           const updatedTitles = chatTitles.filter((t) => t.id !== chatId);
           setChatTitles(updatedTitles);
-          
+
           // Update filtered titles if we're in search mode
           if (searchText.trim() !== "") {
-            setFilteredTitles(updatedTitles.filter(chat => 
+            setFilteredTitles(updatedTitles.filter(chat =>
               chat.title.toLowerCase().includes(searchText.toLowerCase())
             ));
           }
-          
+
           onNewChatClick();
-        }  else {
+        } else {
           throw new Error("There was a problem deleting the chat. Code: " + res.status);
         }
       })
@@ -195,7 +202,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
       });
     }
   };
-  
+
   const groupChatsByDate = (chats: ChatTitle[]): { [key: string]: ChatTitle[] } => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Midnight today
@@ -205,12 +212,12 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     lastSevenDays.setDate(lastSevenDays.getDate() - 7);
     const lastThirtyDays = new Date(today);
     lastThirtyDays.setDate(lastThirtyDays.getDate() - 30);
-  
+
     const groups: { [key: string]: ChatTitle[] } = {};
-  
+
     chats.forEach((chat) => {
       const lastActivity = new Date(chat.last_activity);
-      
+
       if (lastActivity >= today) {
         if (!groups['Today']) groups['Today'] = [];
         groups['Today'].push(chat);
@@ -229,32 +236,32 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         groups[year].push(chat);
       }
     });
-  
+
     return groups;
   };
-  
+
   // Determine which chats to display based on search state
   const chatsToDisplay = searchText.trim() !== "" ? filteredTitles : chatTitles;
   const groupedChats = groupChatsByDate(chatsToDisplay);
   const sortedGroups = Object.entries(groupedChats)
-  .sort(([a], [b]) => {
-    const categoryOrder = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days'];
-    const aIsYear = !isNaN(Number(a));
-    const bIsYear = !isNaN(Number(b));
-    
-    if (categoryOrder.includes(a) && categoryOrder.includes(b)) {
-      return categoryOrder.indexOf(a) - categoryOrder.indexOf(b);
-    }
-    if (categoryOrder.includes(a)) return -1;
-    if (categoryOrder.includes(b)) return 1;
-    if (aIsYear && bIsYear) return parseInt(b) - parseInt(a);
-    return 0;
-  })
-  .map(([name, chats]) => ({ name, chats }));
+    .sort(([a], [b]) => {
+      const categoryOrder = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days'];
+      const aIsYear = !isNaN(Number(a));
+      const bIsYear = !isNaN(Number(b));
+
+      if (categoryOrder.includes(a) && categoryOrder.includes(b)) {
+        return categoryOrder.indexOf(a) - categoryOrder.indexOf(b);
+      }
+      if (categoryOrder.includes(a)) return -1;
+      if (categoryOrder.includes(b)) return 1;
+      if (aIsYear && bIsYear) return parseInt(b) - parseInt(a);
+      return 0;
+    })
+    .map(([name, chats]) => ({ name, chats }));
 
   useEffect(() => {
     const getConversations = async (newToken?: string | null): Promise<void> => {
-      try{
+      try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations`, {
           method: "GET",
           headers: {
@@ -273,7 +280,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           return getConversations(newToken);
         }
         const data = await response.json();
-        if(data!=null && data.length!= 0) {
+        if (data != null && data.length != 0) {
           if (Object.keys(data).length === 0) {
             // Handle empty JSON object
             setChatTitles([]);
@@ -288,7 +295,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
         }
         setIsFetchingChatTitles(false);
       }
-      catch(error) {
+      catch (error) {
         toast({
           variant: "destructive",
           title: "Uh oh! Something went wrong.",
@@ -312,7 +319,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     });
     // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
-  }, [chatService]); 
+  }, [chatService]);
 
   // Create or get a ref for a chat item
   const getOrCreateRef = (id: string) => {
@@ -379,7 +386,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                   onClick={toggleSearch}
                   aria-label="Search chats"
                 >
-                  < Search className='size-6'/>
+                  < Search className='size-6' />
                 </button>
               </div>
             )}
@@ -423,9 +430,9 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                               <ContextMenuTrigger className={`group flex items-center h-8 rounded-md px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
                                 <button
                                   className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
-                                  onClick={(e) => { 
-                                    e.preventDefault(); 
-                                    onOldChatClick(chatTitle.id); 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    onOldChatClick(chatTitle.id);
                                     if (window.innerWidth < 768) {
                                       toggleChatHistoryVisibility();
                                     }
@@ -434,54 +441,52 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                               </ContextMenuTrigger>
                               <ContextMenuContent>
                                 <DialogTrigger className="block w-full text-left text-sm"><ContextMenuItem>Rename</ContextMenuItem></DialogTrigger>
-                                <ContextMenuItem onClick={() => {handleDelete(chatTitle.id)}}>Delete</ContextMenuItem>
+                                <ContextMenuItem onClick={() => { handleDelete(chatTitle.id) }}>Delete</ContextMenuItem>
                               </ContextMenuContent>
                             </ContextMenu>
                             {/* Dropdown menu for each chat title */}
                             <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100`}>
-                                <DropdownMenu modal={false}>
-                                  <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
-                                      <svg className="w-5 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
-                                        <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
-                                      </svg>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent>
-                                    <DialogTrigger className="block w-full text-left text-sm">
-                                      <DropdownMenuItem >Rename</DropdownMenuItem>
-                                    </DialogTrigger>
-                                    <DropdownMenuItem onClick={() => {handleDelete(chatTitle.id)}}>
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                                <DialogContent className="max-w-[400px] md:max-w-[425px]">
-                                  <DialogHeader className="max-md:text-left">
-                                    <DialogTitle>Edit Chat Title</DialogTitle>
-                                    <DialogDescription>
-                                      Click save when you&apos;re done.
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="grid gap-4 py-4 max-md:justify-start">
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                      <Label htmlFor="name" className="text-right">
-                                        Title
-                                      </Label>
-                                      <Input
-                                        id="name"
-                                        defaultValue={chatTitle.title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        className="col-span-3"
-                                      />
-                                    </div>
+                              <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
+                                  <Ellipsis className='w-5 h-5' />
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                  <DialogTrigger className="block w-full text-left text-sm">
+                                    <DropdownMenuItem >Rename</DropdownMenuItem>
+                                  </DialogTrigger>
+                                  <DropdownMenuItem onClick={() => { handleDelete(chatTitle.id) }}>
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                              <DialogContent className="max-w-[400px] md:max-w-[425px]">
+                                <DialogHeader className="max-md:text-left">
+                                  <DialogTitle>Edit Chat Title</DialogTitle>
+                                  <DialogDescription>
+                                    Click save when you&apos;re done.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="grid gap-4 py-4 max-md:justify-start">
+                                  <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="name" className="text-right">
+                                      Title
+                                    </Label>
+                                    <Input
+                                      id="name"
+                                      defaultValue={chatTitle.title}
+                                      onChange={(e) => setTitle(e.target.value)}
+                                      className="col-span-3"
+                                    />
                                   </div>
-                                  <DialogFooter>
-                                    <DialogClose asChild>
-                                      <Button type="button" className="w-fit ml-auto" onClick={() => {handleRename(chatTitle.id, title)}}>
-                                        Save changes
-                                      </Button>
-                                    </DialogClose>
-                                  </DialogFooter>
-                                </DialogContent>
+                                </div>
+                                <DialogFooter>
+                                  <DialogClose asChild>
+                                    <Button type="button" className="w-fit ml-auto" onClick={() => { handleRename(chatTitle.id, title) }}>
+                                      Save changes
+                                    </Button>
+                                  </DialogClose>
+                                </DialogFooter>
+                              </DialogContent>
                             </div>
                           </Dialog>
                         </div>
@@ -492,50 +497,57 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
               ))}
             </div>
           )}
-          <div className="w-full left-0 right-0 chat-history">
-            <div className="flex items-center gap-2 rounded-md p-2 text-sm hover-light-dark w-full">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center overflow-hidden rounded-full">
-                  <div className="relative flex">
-                    <img
-                      alt="User"
-                      loading="lazy"
-                      width="32"
-                      height="32"
-                      decoding="async"
-                      data-nimg="1"
-                      className="rounded-sm"
-                      style={{ color: 'transparent' }}
-                      src={userImage}
-                    />
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <div className="w-full left-0 right-0 chat-history">
+                <div className="flex items-center gap-2 rounded-md p-2 text-sm hover-light-dark w-full">
+                  <Avatar className="h-8 w-8 rounded-full">
+                    <AvatarImage src={userImage} alt={firstName} />
+                    <AvatarFallback className="rounded-full">CN</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{firstName} {lastName}</span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {uMail}
+                    </span>
+                  </div>
+                  <EllipsisVertical className="ml-auto size-4" />
+                </div>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side={isMobileDevice() ? 'top' : 'right'}>
+              <DropdownMenuLabel className="p-0 font-normal">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                  <Avatar className="h-8 w-8 rounded-full">
+                    <AvatarImage src={userImage} alt={firstName} />
+                    <AvatarFallback className="rounded-full">CN</AvatarFallback>
+                  </Avatar>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-medium">{firstName} {lastName}</span>
+                    <span className="text-muted-foreground truncate text-xs">
+                      {uMail}
+                    </span>
                   </div>
                 </div>
-              </div>
-              <div className="relative -top-px grow -space-y-px overflow-hidden text-ellipsis whitespace-nowrap text-left">
-                <div>
-                  {firstName} {lastName}
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <svg className="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 16 3">
-                    <path d="M2 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm6.041 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM14 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z" />
-                  </svg>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {/* <DropdownMenuItem>Profile</DropdownMenuItem> */}
-                  {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
-                  {/* <DropdownMenuItem>Settings</DropdownMenuItem> */}
-                  <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <UserRoundCog /> Account
+                <DropdownMenuShortcut>⇧⌘A</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
+              <DropdownMenuItem>
+                <Settings /> Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
+                <LogOut /> Log out
+                <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </nav>
       </div>
-    </div>
+    </div >
   );
 };
 
