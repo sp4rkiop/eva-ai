@@ -19,8 +19,8 @@ class ChatHistory(Base):
     history_blob: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     chat_title: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_updated: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), 
-                                                   default=datetime.now(UTC), server_default=text("timezone('utc', now())"), 
-                                                   onupdate=datetime.now(UTC), server_onupdate=text("timezone('utc', now())"), 
+                                                   default=lambda: datetime.now(UTC), server_default=text("timezone('utc', now())"), 
+                                                   onupdate=lambda: datetime.now(UTC), server_onupdate=text("timezone('utc', now())"), 
                                                    index=True, nullable=False)
     token_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
