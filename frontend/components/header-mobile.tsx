@@ -122,7 +122,7 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
       </button>
       <div className="group flex cursor-pointer items-center gap-1 rounded-md hover-light-dark dark:hover:bg-neutral-950">
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
+          <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold capitalize">
               {selectedModel || 'Default Model'}
               <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
           </DropdownMenuTrigger>
@@ -139,7 +139,7 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
                   <DropdownMenuItem
                     key={model.id}
                     onClick={() => handleModelChange(model.name, model.id, true)}
-                    className="uppercase"
+                    className="capitalize"
                   >
                     {model.name}
                   </DropdownMenuItem>

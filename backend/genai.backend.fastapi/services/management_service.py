@@ -4,6 +4,9 @@ from sqlalchemy import select
 from core.database import PostgreSQLDatabase
 from repositories.cache_repository import CacheRepository
 from models.ai_models_model import AiModels
+from models.subscriptions_model import Subscriptions
+from models.users_model import Users
+from models.chat_history_model import ChatHistory
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

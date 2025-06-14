@@ -235,9 +235,9 @@
     --chart-5: 340 75% 55%;
   }
 
-  .chat-history {
+  .sidebar-color {
     color: white;
-    background: #171717; /* Set chat-history background color for dark theme */
+    background: #171717; /* Set sidebar-color background color for dark theme */
   }
   
   .hover-light-dark {
@@ -338,9 +338,9 @@
     --chart-5: 27 87% 67%;
   }
 
-  .chat-history {
+  .sidebar-color {
     color: black;
-    background: #f9f9f9; /* Set chat-history background color for light theme */
+    background: #f9f9f9; /* Set sidebar-color background color for light theme */
   }
 
   .hover-light-dark {

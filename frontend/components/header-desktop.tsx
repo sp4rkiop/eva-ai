@@ -114,7 +114,7 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
                 <div className="absolute left-1/2 -translate-x-1/2"></div>
                 <div className="flex items-center gap-2 hover-light-dark dark:hover:bg-neutral-950 rounded-md">
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
+                      <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold capitalize">
                           {selectedModel || 'Default Model'}
                           <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
                       </DropdownMenuTrigger>
@@ -131,7 +131,7 @@ const HeaderDesktop: React.FC<ModelSelectProps> = ({service, getuId_token, back_
                               <DropdownMenuItem
                                 key={model.id}
                                 onClick={() => handleModelChange(model.name, model.id, true)}
-                                className="uppercase"
+                                className="capitalize"
                               >
                                 {model.name}
                               </DropdownMenuItem>

@@ -341,7 +341,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           <IconClose className="size-6" />
         </button>
       </div>
-      <div className="h-full chat-history overflow-y-auto">
+      <div className="h-full sidebar-color overflow-y-auto">
         <nav className="flex flex-col justify-between h-full w-full px-3 py-3" aria-label="Chat history">
           <div className="max-md:pt-10">
             {showSearch ? (
@@ -448,7 +448,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                             <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100`}>
                               <DropdownMenu modal={false}>
                                 <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
-                                  <Ellipsis className='w-5 h-5' />
+                                  <Ellipsis className='size-4' />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                   <DialogTrigger className="block w-full text-left text-sm">
@@ -499,11 +499,11 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
           )}
           <DropdownMenu>
             <DropdownMenuTrigger>
-              <div className="w-full left-0 right-0 chat-history">
+              <div className="w-full left-0 right-0 sidebar-color">
                 <div className="flex items-center gap-2 rounded-md p-2 text-sm hover-light-dark w-full">
                   <Avatar className="h-8 w-8 rounded-full">
                     <AvatarImage src={userImage} alt={firstName} />
-                    <AvatarFallback className="rounded-full">CN</AvatarFallback>
+                    <AvatarFallback className="rounded-full">{firstName[0]}{lastName[0]}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{firstName} {lastName}</span>
@@ -532,7 +532,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem>
-                <UserRoundCog /> Account
+                <UserRoundCog /> Admin Dashboard
                 <DropdownMenuShortcut>⇧⌘A</DropdownMenuShortcut>
               </DropdownMenuItem>
               {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}

@@ -451,7 +451,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                                       (
                                         <Avatar className="h-6 w-6 rounded-full">
                                           <AvatarImage src={uImg} alt={fName} />
-                                          <AvatarFallback className="rounded-full">User</AvatarFallback>
+                                          <AvatarFallback className="rounded-full">{fName[0]}{lName[0]}</AvatarFallback>
                                         </Avatar>
                                       )
                                       : (
