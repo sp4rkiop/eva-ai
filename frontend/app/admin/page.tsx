@@ -1,4 +1,5 @@
 'use client';
+import { useInView } from 'react-intersection-observer';
 import { useState, useEffect, useRef } from 'react';
 import { LayoutDashboard, Users, Bot, BarChart4, Search, Trash2, Plus, Menu, X, } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, } from '@/components/ui/card';
@@ -15,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { authenticateUser } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 // Extend next-auth session type to include custom properties
 declare module "next-auth" {
@@ -26,138 +27,72 @@ declare module "next-auth" {
   }
 }
 
-// Dummy data
-const users = [
-  {
-    id: 1, name: 'Alex Johnson', email: 'alex@example.com', image: 'https://via.placeholder.com/150', lastActive: '2 hours ago', models: ['gpt-4', 'claude-2'], chats: 24, tokens: 12500, chatHistory: [
-      { id: 'c1', title: 'API Integration Help', tokens: 3400, lastActivity: '2023-11-12' },
-      { id: 'c2', title: 'Payment Issue', tokens: 5600, lastActivity: '2023-11-10' },
-    ]
-  },
-  {
-    id: 2, name: 'Sam Smith', email: 'sam@example.com', image: 'https://via.placeholder.com/150', lastActive: '1 day ago', models: ['gpt-3.5'], chats: 42, tokens: 28700, chatHistory: [
-      { id: 'c1', title: 'API Integration Help', tokens: 3400, lastActivity: '2023-11-12' },
-      { id: 'c2', title: 'Payment Issue', tokens: 5600, lastActivity: '2023-11-10' },
-    ]
-  },
-  {
-    id: 3, name: 'Taylor Brown', email: 'taylor@example.com', image: 'https://via.placeholder.com/150', lastActive: '3 days ago', models: ['llama-2', 'mistral'], chats: 18, tokens: 9600, chatHistory: [
-      { id: 'c1', title: 'API Integration Help', tokens: 3400, lastActivity: '2023-11-12' },
-      { id: 'c2', title: 'Payment Issue', tokens: 5600, lastActivity: '2023-11-10' },
-    ]
-  },
-];
+interface User {
+  user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  partner: string;
+  chat_count: number;
+  total_tokens: number;
+  latest_activity: string | null;
+  models_sub: {
+    model_id: string;
+    model_name: string;
+    provider: string;
+  }[];
+}
 
-const models = [
-  { id: 'gpt-4', name: 'GPT-4', provider: 'OpenAI', status: 'active', users: 142 },
-  { id: 'claude-2', name: 'Claude 2', provider: 'Anthropic', status: 'active', users: 87 },
-  { id: 'llama-2', name: 'Llama 2', provider: 'Meta', status: 'active', users: 65 },
-  { id: 'mistral', name: 'Mistral', provider: 'Mistral AI', status: 'beta', users: 23 },
-];
+interface UsersData {
+  page_size: number;
+  users: User[];
+  next_cursor: string | null;
+  prev_cursor: string | null;
+}
 
-const chartData = [
-  { date: "2024-04-01", desktop: 222, mobile: 150 },
-  { date: "2024-04-02", desktop: 97, mobile: 180 },
-  { date: "2024-04-03", desktop: 167, mobile: 120 },
-  { date: "2024-04-04", desktop: 242, mobile: 260 },
-  { date: "2024-04-05", desktop: 373, mobile: 290 },
-  { date: "2024-04-06", desktop: 301, mobile: 340 },
-  { date: "2024-04-07", desktop: 245, mobile: 180 },
-  { date: "2024-04-08", desktop: 409, mobile: 320 },
-  { date: "2024-04-09", desktop: 59, mobile: 110 },
-  { date: "2024-04-10", desktop: 261, mobile: 190 },
-  { date: "2024-04-11", desktop: 327, mobile: 350 },
-  { date: "2024-04-12", desktop: 292, mobile: 210 },
-  { date: "2024-04-13", desktop: 342, mobile: 380 },
-  { date: "2024-04-14", desktop: 137, mobile: 220 },
-  { date: "2024-04-15", desktop: 120, mobile: 170 },
-  { date: "2024-04-16", desktop: 138, mobile: 190 },
-  { date: "2024-04-17", desktop: 446, mobile: 360 },
-  { date: "2024-04-18", desktop: 364, mobile: 410 },
-  { date: "2024-04-19", desktop: 243, mobile: 180 },
-  { date: "2024-04-20", desktop: 89, mobile: 150 },
-  { date: "2024-04-21", desktop: 137, mobile: 200 },
-  { date: "2024-04-22", desktop: 224, mobile: 170 },
-  { date: "2024-04-23", desktop: 138, mobile: 230 },
-  { date: "2024-04-24", desktop: 387, mobile: 290 },
-  { date: "2024-04-25", desktop: 215, mobile: 250 },
-  { date: "2024-04-26", desktop: 75, mobile: 130 },
-  { date: "2024-04-27", desktop: 383, mobile: 420 },
-  { date: "2024-04-28", desktop: 122, mobile: 180 },
-  { date: "2024-04-29", desktop: 315, mobile: 240 },
-  { date: "2024-04-30", desktop: 454, mobile: 380 },
-  { date: "2024-05-01", desktop: 165, mobile: 220 },
-  { date: "2024-05-02", desktop: 293, mobile: 310 },
-  { date: "2024-05-03", desktop: 247, mobile: 190 },
-  { date: "2024-05-04", desktop: 385, mobile: 420 },
-  { date: "2024-05-05", desktop: 481, mobile: 390 },
-  { date: "2024-05-06", desktop: 498, mobile: 520 },
-  { date: "2024-05-07", desktop: 388, mobile: 300 },
-  { date: "2024-05-08", desktop: 149, mobile: 210 },
-  { date: "2024-05-09", desktop: 227, mobile: 180 },
-  { date: "2024-05-10", desktop: 293, mobile: 330 },
-  { date: "2024-05-11", desktop: 335, mobile: 270 },
-  { date: "2024-05-12", desktop: 197, mobile: 240 },
-  { date: "2024-05-13", desktop: 197, mobile: 160 },
-  { date: "2024-05-14", desktop: 448, mobile: 490 },
-  { date: "2024-05-15", desktop: 473, mobile: 380 },
-  { date: "2024-05-16", desktop: 338, mobile: 400 },
-  { date: "2024-05-17", desktop: 499, mobile: 420 },
-  { date: "2024-05-18", desktop: 315, mobile: 350 },
-  { date: "2024-05-19", desktop: 235, mobile: 180 },
-  { date: "2024-05-20", desktop: 177, mobile: 230 },
-  { date: "2024-05-21", desktop: 82, mobile: 140 },
-  { date: "2024-05-22", desktop: 81, mobile: 120 },
-  { date: "2024-05-23", desktop: 252, mobile: 290 },
-  { date: "2024-05-24", desktop: 294, mobile: 220 },
-  { date: "2024-05-25", desktop: 201, mobile: 250 },
-  { date: "2024-05-26", desktop: 213, mobile: 170 },
-  { date: "2024-05-27", desktop: 420, mobile: 460 },
-  { date: "2024-05-28", desktop: 233, mobile: 190 },
-  { date: "2024-05-29", desktop: 78, mobile: 130 },
-  { date: "2024-05-30", desktop: 340, mobile: 280 },
-  { date: "2024-05-31", desktop: 178, mobile: 230 },
-  { date: "2024-06-01", desktop: 178, mobile: 200 },
-  { date: "2024-06-02", desktop: 470, mobile: 410 },
-  { date: "2024-06-03", desktop: 103, mobile: 160 },
-  { date: "2024-06-04", desktop: 439, mobile: 380 },
-  { date: "2024-06-05", desktop: 88, mobile: 140 },
-  { date: "2024-06-06", desktop: 294, mobile: 250 },
-  { date: "2024-06-07", desktop: 323, mobile: 370 },
-  { date: "2024-06-08", desktop: 385, mobile: 320 },
-  { date: "2024-06-09", desktop: 438, mobile: 480 },
-  { date: "2024-06-10", desktop: 155, mobile: 200 },
-  { date: "2024-06-11", desktop: 92, mobile: 150 },
-  { date: "2024-06-12", desktop: 492, mobile: 420 },
-  { date: "2024-06-13", desktop: 81, mobile: 130 },
-  { date: "2024-06-14", desktop: 426, mobile: 380 },
-  { date: "2024-06-15", desktop: 307, mobile: 350 },
-  { date: "2024-06-16", desktop: 371, mobile: 310 },
-  { date: "2024-06-17", desktop: 475, mobile: 520 },
-  { date: "2024-06-18", desktop: 107, mobile: 170 },
-  { date: "2024-06-19", desktop: 341, mobile: 290 },
-  { date: "2024-06-20", desktop: 408, mobile: 450 },
-  { date: "2024-06-21", desktop: 169, mobile: 210 },
-  { date: "2024-06-22", desktop: 317, mobile: 270 },
-  { date: "2024-06-23", desktop: 480, mobile: 530 },
-  { date: "2024-06-24", desktop: 132, mobile: 180 },
-  { date: "2024-06-25", desktop: 141, mobile: 190 },
-  { date: "2024-06-26", desktop: 434, mobile: 380 },
-  { date: "2024-06-27", desktop: 448, mobile: 490 },
-  { date: "2024-06-28", desktop: 149, mobile: 200 },
-  { date: "2024-06-29", desktop: 103, mobile: 160 },
-  { date: "2024-06-30", desktop: 446, mobile: 400 },
-]
+interface Model {
+  model_id: string;
+  model_name: string;
+  provider: string;
+  is_active: boolean;
+  model_type: string;
+}
+interface ModelsData {
+  page_size: number;
+  models: Model[];
+  next_cursor: string | null;
+  prev_cursor: string | null;
+}
 
 const chartConfig = {
-  visitors: {
-    label: "Visitors",
-  },
-  desktop: {
+  tokens_used: {
     label: "Tokens Consumption",
     color: "hsl(var(--chart-1))",
   },
 } satisfies ChartConfig
+
+function getTimeElapsed(lastActive: Date): string {
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - lastActive.getTime()) / 1000);
+
+  const units = [
+    { name: 'year', seconds: 31536000 },
+    { name: 'month', seconds: 2592000 },
+    { name: 'day', seconds: 86400 },
+    { name: 'hour', seconds: 3600 },
+    { name: 'minute', seconds: 60 },
+    { name: 'second', seconds: 1 },
+  ];
+
+  for (const unit of units) {
+    const count = Math.floor(diffInSeconds / unit.seconds);
+    if (count > 0) {
+      return `${count} ${unit.name}${count > 1 ? 's' : ''} ago`;
+    }
+  }
+  return 'just now';
+}
 
 // JWT Decoding and Validation Utilities
 const decodeJWT = (token: string) => {
@@ -187,6 +122,7 @@ const isTokenExpired = (token: string): boolean => {
   const currentTime = Math.floor(Date.now() / 1000);
   return decoded.exp < currentTime;
 };
+
 export default function AdminDashboard() {
   const router = useRouter();
   const { data: session, status, update } = useSession();
@@ -195,19 +131,30 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeRange, setTimeRange] = useState("90d")
   const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [userSearch, setUserSearch] = useState('');
+  const [modelSearch, setModelSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const itemsPerPage = 5;
-
+  // ── Backend data ─────────────────────────────────────────────────────────────
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeModels, setActiveModels] = useState(0);
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [users_data, setUsers] = useState<UsersData>({ page_size: 0, users: [], next_cursor: null, prev_cursor: null });
+  const [models_data, setModels] = useState<ModelsData>({ page_size: 0, models: [], next_cursor: null, prev_cursor: null });
+  const pageSize = 5;
+  // Visibility sentinels (triggerOnce = true → only first time in view)
+  const [usersRef, usersInView] = useInView({ triggerOnce: true, rootMargin: '200px' });
+  const [modelsRef, modelsInView] = useInView({ triggerOnce: true, rootMargin: '200px' });
   // Stats calculations
-  const totalUsers = 243;
-  const totalTokens = chartData.reduce((sum, day) => sum + day.desktop, 0);
-  const avgTokens = Math.round(totalTokens / chartData.length);
+  const totalTokens = chartData.reduce((sum, day) => sum + day.tokens_used, 0);
+  const avgTokens = chartData.length
+    ? Math.round(totalTokens / chartData.length)
+    : 0;
 
   const filteredData = chartData.filter((item) => {
     const date = new Date(item.date)
-    const referenceDate = new Date("2024-06-30")
+    const referenceDate = new Date()
     let daysToSubtract = 90
     if (timeRange === "30d") {
       daysToSubtract = 30
@@ -219,15 +166,151 @@ export default function AdminDashboard() {
     return date >= startDate
   })
 
-  // Pagination logic
-  const totalPages = Math.ceil(models.length / itemsPerPage);
-  const currentModels = models.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
-  // Initialize chat service when authenticated
+  const fetchHomeData = async () => {
+    if (!session?.back_auth) return;
+    isRefreshing.current = true;
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/home`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        const data = await res.json();
+
+        // 🔄 Update state with backend payload
+        setTotalUsers(data.total_users ?? 0);
+        setActiveModels(data.active_models ?? 0);
+        setRecentUsers(data.recent_users ?? []);
+        setChartData(data.usage_chat ?? []);
+        setIsInitialized(true);
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    } finally {
+      isRefreshing.current = false;
+    }
+  };
+
+  const fetchUsers = async (limit: number, query: string = '', cursor: string = '') => {
+    if (!session?.back_auth) return;
+
+    // build the query string
+    const params = new URLSearchParams({ page_size: String(limit) });
+    params.append('query', query);
+    params.append('cursor', cursor);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/users?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        const data = await res.json();
+        setUsers(data);
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  const fetchModels = async (limit: number, query: string = '', cursor: string = '') => {
+    if (!session?.back_auth) return;
+
+    // build the query string
+    const params = new URLSearchParams({ page_size: String(limit) });
+    params.append('query', query);
+    params.append('cursor', cursor);
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/models?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        const data = await res.json();
+        setModels(data);
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  // Initialize analytics service when authenticated
   useEffect(() => {
-    const initializeChatService = async () => {
+    const initService = async () => {
       if (!session || status !== 'authenticated' || isRefreshing.current) return;
 
       try {
@@ -260,9 +343,9 @@ export default function AdminDashboard() {
           currentAuth = back_auth;
           currentUserId = userid;
         }
-        // Set auth token and user ID -> init chat service
+        // Set auth token and user ID -> init analytics service
         if (currentAuth && currentUserId) {
-          setIsInitialized(true);
+          fetchHomeData();
         }
       } catch (error) {
         toast({
@@ -278,7 +361,7 @@ export default function AdminDashboard() {
       }
     };
 
-    initializeChatService();
+    initService();
   }, [status, session]);
   // Detect mobile screens
   useEffect(() => {
@@ -293,13 +376,25 @@ export default function AdminDashboard() {
     if (isMobile) setSidebarOpen(false);
   }, [activeTab, isMobile]);
 
+  useEffect(() => {
+    if (usersInView && users_data.users.length === 0) {
+      fetchUsers(pageSize);                    // 👈 pick a sensible page size
+    }
+  }, [usersInView]);
+
+  useEffect(() => {
+    if (modelsInView && models_data.models.length === 0) {
+      fetchModels(pageSize);
+    }
+  }, [modelsInView]);
+
+
   // Show loading state while checking auth status
   if (status === 'loading' || !isInitialized) {
     return <div className="fixed inset-0 flex items-center justify-center">
       <LoadingSpinner show={true} />
     </div>;
   }
-
   const [firstName, lastName] = session?.user?.name?.split(/\s+/) ?? ['', ''];
 
   return (
@@ -399,18 +494,18 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{totalUsers}</div>
-                  <p className="text-xs ">+12 from last month</p>
+                  {/* <p className="text-xs ">+12 from last month</p> */}
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium ">Total Tokens</CardTitle>
+                  <CardTitle className="text-sm font-medium ">Tokens Consumed</CardTitle>
                   <BarChart4 className="h-4 w-4 " />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{(totalTokens / 1000).toFixed(1)}k</div>
-                  <p className="text-xs ">+18.2% from last week</p>
+                  {/* <p className="text-xs ">+18.2% from last week</p> */}
                 </CardContent>
               </Card>
 
@@ -421,7 +516,7 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">{(avgTokens / 1000).toFixed(1)}k</div>
-                  <p className="text-xs ">per day</p>
+                  <p className="text-xs ">Tokens per day</p>
                 </CardContent>
               </Card>
 
@@ -431,15 +526,15 @@ export default function AdminDashboard() {
                   <Bot className="h-4 w-4 " />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{models.length}</div>
-                  <p className="text-xs ">2 in beta</p>
+                  <div className="text-2xl font-bold">{activeModels}</div>
+                  {/* <p className="text-xs ">2 in beta</p> */}
                 </CardContent>
               </Card>
             </div>
 
             {/* Usage Chart */}
             <div className="flex flex-col lg:flex-row gap-4 mb-8">
-              <Card className="lg:w-2/3">
+              <Card className="flex-1">
                 <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 flex-row">
                   <div className="grid flex-1 gap-1 text-center sm:text-left">
                     <CardTitle>Usage Chart</CardTitle>
@@ -471,15 +566,15 @@ export default function AdminDashboard() {
                   >
                     <AreaChart data={filteredData}>
                       <defs>
-                        <linearGradient id="fillDesktop" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="fillTokensUsed" x1="0" y1="0" x2="0" y2="1">
                           <stop
                             offset="5%"
-                            stopColor="var(--color-desktop)"
+                            stopColor="var(--color-tokens_used)"
                             stopOpacity={0.8}
                           />
                           <stop
                             offset="95%"
-                            stopColor="var(--color-desktop)"
+                            stopColor="var(--color-tokens_used)"
                             stopOpacity={0.1}
                           />
                         </linearGradient>
@@ -511,6 +606,11 @@ export default function AdminDashboard() {
                           })
                         }}
                       />
+                      {/* <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        tickMargin={8}
+                      /> */}
                       <ChartTooltip
                         cursor={false}
                         content={
@@ -533,10 +633,10 @@ export default function AdminDashboard() {
                         stackId="a"
                       /> */}
                       <Area
-                        dataKey="desktop"
+                        dataKey="tokens_used"
                         type="natural"
-                        fill="url(#fillDesktop)"
-                        stroke="var(--color-desktop)"
+                        fill="url(#fillTokensUsed)"
+                        stroke="var(--color-tokens_used)"
                         stackId="a"
                       />
                       <ChartLegend content={<ChartLegendContent />} />
@@ -546,22 +646,30 @@ export default function AdminDashboard() {
               </Card>
 
               {/* Recent Activity */}
-              <Card className="lg:w-1/3">
+              <Card>
                 <CardHeader>
                   <CardTitle>Recent Activity</CardTitle>
                   <CardDescription>Latest user interactions</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {users.slice(0, 3).map((user) => (
-                    <div key={user.id} className="flex items-start">
-                      <Avatar className="mr-2 size-8 rounded-full">
-                        <AvatarImage src={user.image} />
-                        <AvatarFallback className="rounded-full">{user.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="ml-3">
-                        <p className="font-medium">{user.name}</p>
-                        <p className="text-sm ">
-                          Started new chat · {user.lastActive}
+                  {recentUsers.map((user) => (
+                    <div key={user.user_id} className="flex items-start">
+                      <div className="flex">
+                        <Avatar className="mr-2 size-8 rounded-full">
+                          {/* <AvatarImage src={user.image} /> */}
+                          <AvatarFallback className="rounded-full">
+                            {user.first_name?.charAt(0)}
+                            {user.last_name?.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="ml-3">
+                          <p className="font-medium">{user.first_name} {user.last_name}</p>
+                          <p className="text-sm text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="ml-auto self-center">
+                        <p className="text-sm truncate">
+                          {getTimeElapsed(new Date(user.last_active))}
                         </p>
                       </div>
                     </div>
@@ -571,15 +679,24 @@ export default function AdminDashboard() {
             </div>
 
             {/* Users Table */}
-            <Card className="mb-8">
+            <Card className="mb-8" ref={usersRef}>
               <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center">
                   <div>
                     <CardTitle>Users</CardTitle>
                   </div>
                   <div className="flex gap-2 flex-row">
-                    <Input placeholder="Search users..." className="w-full" />
-                    <Button variant="outline" className="whitespace-nowrap">
+                    <Input
+                      placeholder="Search users..."
+                      className="w-full"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={() => fetchUsers(pageSize, userSearch)}
+                    >
                       <Search className="w-4 h-4 mr-2" />
                       Search
                     </Button>
@@ -598,20 +715,20 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
+                    {users_data.users.map((user) => (
+                      <TableRow key={user.user_id}>
                         <TableCell>
-                          <div className="font-medium">{user.name}</div>
+                          <div className="font-medium">{user.first_name} {user.last_name}</div>
                           <div className="text-sm ">{user.email}</div>
                         </TableCell>
-                        <TableCell className="truncate">{user.lastActive}</TableCell>
-                        <TableCell>{user.chats}</TableCell>
-                        <TableCell>{(user.tokens / 1000).toFixed(1)}k</TableCell>
+                        <TableCell className="truncate">{user.latest_activity ? getTimeElapsed(new Date(user.latest_activity)) : 'N/A'}</TableCell>
+                        <TableCell>{user.chat_count}</TableCell>
+                        <TableCell>{(user.total_tokens / 1000).toFixed(1)}k</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {user.models.map((model) => (
-                              <Badge key={model} variant="outline">
-                                {model}
+                            {user.models_sub.map((model) => (
+                              <Badge key={model.model_id} variant="outline" className="truncate">
+                                {model.model_name}
                               </Badge>
                             ))}
                           </div>
@@ -624,12 +741,22 @@ export default function AdminDashboard() {
                 <Pagination className="mt-4">
                   <PaginationContent>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!users_data.prev_cursor}
+                        onClick={() => users_data.prev_cursor && fetchUsers(pageSize, "", users_data.prev_cursor)}
+                      >
                         Previous
                       </Button>
                     </PaginationItem>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!users_data.next_cursor}
+                        onClick={() => users_data.next_cursor && fetchUsers(pageSize, "", users_data.next_cursor)}
+                      >
                         Next
                       </Button>
                     </PaginationItem>
@@ -639,15 +766,24 @@ export default function AdminDashboard() {
             </Card>
 
             {/* Models Table */}
-            <Card>
+            <Card ref={modelsRef}>
               <CardHeader>
                 <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center">
                   <div>
                     <CardTitle>AI Models</CardTitle>
                   </div>
                   <div className="flex gap-2 flex-row">
-                    <Input placeholder="Search models..." className="w-full" />
-                    <Button variant="outline" className="whitespace-nowrap">
+                    <Input
+                      placeholder="Search models..."
+                      className="w-full"
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={() => fetchModels(pageSize, modelSearch)}
+                    >
                       <Search className="w-4 h-4 mr-2" />
                       Search
                     </Button>
@@ -661,26 +797,49 @@ export default function AdminDashboard() {
                       <TableHead>Model</TableHead>
                       <TableHead>Provider</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Users</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {models.map((model) => (
-                      <TableRow key={model.id}>
-                        <TableCell className="font-medium">{model.name}</TableCell>
+                    {models_data.models.map((model) => (
+                      <TableRow key={model.model_id}>
+                        <TableCell className="font-medium">{model.model_name}</TableCell>
                         <TableCell>{model.provider}</TableCell>
                         <TableCell>
                           <Badge
-                            className={`capitalize ${model.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
+                            className={`capitalize ${model.is_active === true ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
                           >
-                            {model.status}
+                            {model.is_active === true ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
-                        <TableCell>{model.users}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+
+                <Pagination className="mt-4">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!models_data.prev_cursor}
+                        onClick={() => models_data.prev_cursor && fetchUsers(pageSize, "", models_data.prev_cursor)}
+                      >
+                        Previous
+                      </Button>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!models_data.next_cursor}
+                        onClick={() => models_data.next_cursor && fetchUsers(pageSize, "", models_data.next_cursor)}
+                      >
+                        Next
+                      </Button>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
               </CardContent>
             </Card>
           </div>
@@ -690,15 +849,38 @@ export default function AdminDashboard() {
           <div className="p-4 md:p-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h1 className="text-xl md:text-2xl font-bold">User Management</h1>
-              <Button className="whitEditespace-nowrap self-end">
+              {/* <Button className="whitEditespace-nowrap self-end">
                 <Plus className="w-4 h-4 mr-2" />
                 Add User
-              </Button>
+              </Button> */}
             </div>
 
-            <Card>
+            <Card ref={usersRef}>
+              <CardHeader>
+                <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center">
+                  <div>
+                    <CardTitle>Users</CardTitle>
+                  </div>
+                  <div className="flex gap-2 flex-row">
+                    <Input
+                      placeholder="Search users..."
+                      className="w-full"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={() => fetchUsers(pageSize, userSearch)}
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Search
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
               <CardContent>
-                <Table className="overflow-x-auto mt-4">
+                <Table className="overflow-x-auto">
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
@@ -710,23 +892,24 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
+                    {users_data.users.map((user) => (
+                      <TableRow key={user.user_id}>
                         <TableCell>
-                          <div className="font-medium ">{user.name}</div>
+                          <div className="font-medium ">{user.first_name} {user.last_name}</div>
                           <div className="text-sm ">{user.email}</div>
                         </TableCell>
-                        <TableCell>{user.lastActive}</TableCell>
-                        <TableCell>{user.chats}</TableCell>
-                        <TableCell>{(user.tokens / 1000).toFixed(1)}k</TableCell>
+                        <TableCell className="truncate">{user.latest_activity ? getTimeElapsed(new Date(user.latest_activity)) : 'N/A'}</TableCell>
+                        <TableCell>{user.chat_count}</TableCell>
+                        <TableCell>{(user.total_tokens / 1000).toFixed(1)}k</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {user.models.map(model => (
+                            {user.models_sub.map(model => (
                               <Badge
-                                key={model}
+                                key={model.model_id}
                                 variant="outline"
+                                className="truncate"
                               >
-                                {model}
+                                {model.model_name}
                               </Badge>
                             ))}
                           </div>
@@ -750,12 +933,22 @@ export default function AdminDashboard() {
                 <Pagination className="mt-4">
                   <PaginationContent>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!users_data.prev_cursor}
+                        onClick={() => users_data.prev_cursor && fetchUsers(pageSize, "", users_data.prev_cursor)}
+                      >
                         Previous
                       </Button>
                     </PaginationItem>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!users_data.next_cursor}
+                        onClick={() => users_data.next_cursor && fetchUsers(pageSize, "", users_data.next_cursor)}
+                      >
                         Next
                       </Button>
                     </PaginationItem>
@@ -769,7 +962,7 @@ export default function AdminDashboard() {
               <div className="mt-8">
                 <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center mb-4">
                   <h2 className="text-lg md:text-xl font-bold">
-                    {selectedUser.name}'s Details
+                    {selectedUser.first_name} {selectedUser.last_name}'s Details
                   </h2>
                   <Button
                     variant="ghost"
@@ -783,7 +976,7 @@ export default function AdminDashboard() {
                   <CardHeader>
                     <div className="flex flex-row justify-between gap-4">
                       <div>
-                        <CardTitle>{selectedUser.name}</CardTitle>
+                        <CardTitle>{selectedUser.first_name} {selectedUser.last_name}</CardTitle>
                         <p className='text-sm'>{selectedUser.email}</p>
                       </div>
                       <Button variant="destructive" className="whitespace-nowrap">
@@ -797,12 +990,13 @@ export default function AdminDashboard() {
                       <div>
                         <h3 className="font-medium mb-3">Subscribed Models</h3>
                         <div className="flex flex-wrap gap-2">
-                          {selectedUser.models.map((model: string) => (
+                          {selectedUser.models_sub.map((model: any) => (
                             <Badge
-                              key={model}
+                              key={model.model_id}
                               variant="outline"
+                              className="truncate"
                             >
-                              {model}
+                              {model.model_name}
                             </Badge>
                           ))}
                         </div>
@@ -814,7 +1008,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <h3 className="font-medium  mb-3">Chat History</h3>
-                    <Table className="overflow-x-auto">
+                    {/* <Table className="overflow-x-auto">
                       <TableHeader>
                         <TableRow>
                           <TableHead>Chat Title</TableHead>
@@ -837,7 +1031,7 @@ export default function AdminDashboard() {
                           </TableRow>
                         ))}
                       </TableBody>
-                    </Table>
+                    </Table> */}
                   </CardContent>
                 </Card>
               </div>
@@ -856,7 +1050,30 @@ export default function AdminDashboard() {
               </Button>
             </div>
 
-            <Card >
+            <Card ref={modelsRef}>
+              <CardHeader>
+                <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center">
+                  <div>
+                    <CardTitle>AI Models</CardTitle>
+                  </div>
+                  <div className="flex gap-2 flex-row">
+                    <Input
+                      placeholder="Search models..."
+                      className="w-full"
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                    />
+                    <Button
+                      variant="outline"
+                      className="whitespace-nowrap"
+                      onClick={() => fetchModels(pageSize, modelSearch)}
+                    >
+                      <Search className="w-4 h-4 mr-2" />
+                      Search
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
               <CardContent>
                 <Table className="overflow-x-auto mt-4">
                   <TableHeader>
@@ -868,19 +1085,15 @@ export default function AdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {currentModels.map((model) => (
-                      <TableRow key={model.id}>
-                        <TableCell className="font-medium ">
-                          {model.name}
-                        </TableCell>
-                        <TableCell className="">
-                          {model.provider}
-                        </TableCell>
+                    {models_data.models.map((model) => (
+                      <TableRow key={model.model_id}>
+                        <TableCell className="font-medium truncate">{model.model_name}</TableCell>
+                        <TableCell>{model.provider}</TableCell>
                         <TableCell>
                           <Badge
-                            className={`capitalize ${model.status === 'active' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
+                            className={`capitalize ${model.is_active === true ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
                           >
-                            {model.status}
+                            {model.is_active === true ? 'Active' : 'Inactive'}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right justify-end">
@@ -901,12 +1114,22 @@ export default function AdminDashboard() {
                 <Pagination className="mt-4">
                   <PaginationContent>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!models_data.prev_cursor}
+                        onClick={() => models_data.prev_cursor && fetchUsers(pageSize, "", models_data.prev_cursor)}
+                      >
                         Previous
                       </Button>
                     </PaginationItem>
                     <PaginationItem>
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!models_data.next_cursor}
+                        onClick={() => models_data.next_cursor && fetchUsers(pageSize, "", models_data.next_cursor)}
+                      >
                         Next
                       </Button>
                     </PaginationItem>

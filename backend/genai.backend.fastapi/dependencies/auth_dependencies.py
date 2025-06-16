@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional
 from fastapi import Depends, HTTPException, WebSocket
-from datetime import datetime, timezone
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jwt import decode, PyJWTError
+from jose import jwt
+from jose.exceptions import JWTError
 from core.config import settings
 
 security = HTTPBearer()
@@ -80,16 +80,12 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
     """
     try:
         # Decode the JWT token
-        payload = decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
         
         # Check if token has required claims
         if not payload or "sid" not in payload:
             raise HTTPException(status_code=403, detail="Could not validate credentials")
-        
-        # Check token expiration
-        if "exp" in payload and payload["exp"] < int(datetime.now(timezone.utc).timestamp()):
-            raise HTTPException(status_code=403, detail="Token expired")
             
         return payload
-    except PyJWTError:
+    except JWTError:
         raise HTTPException(status_code=403, detail="Could not validate credentials")

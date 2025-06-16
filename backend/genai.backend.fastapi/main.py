@@ -8,15 +8,15 @@ from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from repositories.websocket_manager import ws_manager
 from dependencies.auth_dependencies import get_current_user, authenticate_websocket
-from services.management_service import ModelData
-from api.v1.endpoints import user, chat
+from services.management_service import ManagementService
+from api.v1.endpoints import user, chat, analytics
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- startup ---
     await PostgreSQLDatabase.initialize()
     await CurlCFFIAsyncSession.initialize()
-    await ModelData.get_all_models()
+    await ManagementService.get_all_models()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(scheduled_data_fetch,"interval",seconds = 86400) # 86400 seconds = every 24 hours
     scheduler.start()
@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 async def scheduled_data_fetch():
-    await ModelData.get_all_models()
+    await ManagementService.get_all_models()
 
 app = FastAPI(
     title="Eva", 
@@ -65,3 +65,4 @@ async def websocket_endpoint(websocket: WebSocket):
 # Include routers
 app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"], dependencies=[Depends(get_current_user)])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])

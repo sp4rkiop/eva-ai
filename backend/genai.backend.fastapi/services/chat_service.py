@@ -9,7 +9,7 @@ from models.chat_history_model import ChatHistory
 from models.response_model import ChatResponse
 from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
-from services.management_service import ModelData
+from services.management_service import ManagementService
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -225,7 +225,7 @@ class ChatService:
                 )
                 return ChatResponse(success=False, error_message="Model is not subscribed")
             else:
-                available_models: List[AiModels] = await ModelData.get_all_models()
+                available_models: List[AiModels] = await ManagementService.get_all_models()
                 # Find the requested model from the list
                 selected_model = next((m for m in available_models if m.model_id == model_id and m.is_active), None)
                 if selected_model is None:

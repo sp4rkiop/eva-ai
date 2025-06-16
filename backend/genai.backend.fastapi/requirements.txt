@@ -9,7 +9,7 @@ langchain-community
 Levenshtein
 pydantic-settings
 pydantic[email]
-pyjwt
+python-jose
 asyncpg
 sqlalchemy[asyncio]
 uvicorn[standard]

@@ -1,11 +1,12 @@
 from fastapi import HTTPException
-import uuid, jwt, json, logging, pickle, asyncio
+import uuid, logging, pickle
+from jose import jwt
 from pydantic import EmailStr
 from sqlalchemy import update
 from core.database import PostgreSQLDatabase
 from core.config import settings
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
@@ -125,9 +126,10 @@ class UserService:
         """
         key = settings.JWT_SECRET_KEY
         payload = {
-            'sid': str(user_id),
-            'role': role,
-            'exp': datetime.now(timezone.utc) + timedelta(days=1)
+            "sid": str(user_id),
+            "role": role,
+            "iat": datetime.now(UTC).timestamp(),
+            "exp": (datetime.now(UTC) + timedelta(days=1)).timestamp()
         }
         return jwt.encode(payload, key, algorithm='HS256')
 
