@@ -16,3 +16,12 @@ class ChatRequest(BaseModel):
     user_input: str
     chat_id: Optional[uuid.UUID] = None
 
+class AiModel(BaseModel):
+    model_name: str
+    model_type: str
+    provider: str
+    api_key: str
+    endpoint: str
+    deployment_name: str
+    model_version: str
+    is_active: bool

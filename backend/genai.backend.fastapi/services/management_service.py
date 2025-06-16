@@ -1,8 +1,10 @@
 import logging, uuid
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
+from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select, cast, Date
 from core.database import PostgreSQLDatabase
+from models.request_model import AiModel
 from utils.cursor_utils import encode_cursor, decode_cursor
 from repositories.cache_repository import CacheRepository
 from models.ai_models_model import AiModels
@@ -242,7 +244,11 @@ class ManagementService:
                         "model_name": m.model_name,
                         "provider": m.provider,
                         "is_active": m.is_active,
-                        "model_type": m.model_type
+                        "model_type": m.model_type,
+                        "deployment_name": m.deployment_name,
+                        "api_key": m.api_key,
+                        "endpoint": m.endpoint,
+                        "model_version": m.model_version,
                     }
                     for m in models
                 ],
@@ -322,4 +328,83 @@ class ManagementService:
             }
     
     #Altering functions
+    async def modify_user(self, user_id: uuid.UUID, query_params: Dict[str, Any]):
+        async with PostgreSQLDatabase.get_session() as session:
+            user = await session.get(Users, user_id)
+            if user is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            if query_params.get('role'):
+                user.role = query_params['role'].lower() if query_params['role'].lower() in ['user', 'premium','admin'] else user.role
+            
+            if query_params.get('model_id') is not None :
+                model_id = uuid.UUID(query_params['model_id']) if isinstance(query_params['model_id'], str) else query_params['model_id'] 
+                model = await session.get(AiModels, model_id)
+                if model is None:
+                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+                
+                new_sub = Subscriptions(
+                    user_id=user_id,
+                    model_id=model_id
+                )
+                session.add(new_sub)
+            await session.commit()
     
+    async def delete_user(self, user_id: uuid.UUID):
+        async with PostgreSQLDatabase.get_session() as session:
+            user = await session.get(Users, user_id)
+            if user is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+            await session.delete(user)
+            await session.commit()
+
+    async def modify_model(self, model_id: uuid.UUID, query_params: Dict[str, Any]):
+        async with PostgreSQLDatabase.get_session() as session:
+            model = await session.get(AiModels, model_id)
+            if model is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+            if query_params.get('is_active') is not None and isinstance(query_params['is_active'], bool):
+                model.is_active = query_params['is_active']
+            else:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid is_active value")
+            if query_params.get('model_name'):
+                model.model_name = query_params['model_name']
+            if query_params.get('model_type'):
+                model.model_type = query_params['model_type']
+            if query_params.get('provider'):
+                model.provider = query_params['provider']
+            if query_params.get('api_key'):
+                model.api_key = query_params['api_key']
+            if query_params.get('endpoint'):
+                model.endpoint = query_params['endpoint']
+            if query_params.get('deployment_name'):
+                model.deployment_name = query_params['deployment_name']
+            if query_params.get('model_version'):
+                model.model_version = query_params['model_version']
+            await session.commit()
+            await self.get_all_models()
+
+    async def add_model(self, model_data: AiModel) -> uuid.UUID:
+        async with PostgreSQLDatabase.get_session() as session:
+            new_model = AiModels(
+                model_name=model_data.model_name,
+                model_type=model_data.model_type,
+                provider=model_data.provider,
+                api_key=model_data.api_key,
+                endpoint=model_data.endpoint,
+                deployment_name=model_data.deployment_name,
+                model_version=model_data.model_version,
+                is_active=model_data.is_active
+            )
+            session.add(new_model)
+            await session.commit()
+            await self.get_all_models()
+            return new_model.model_id
+
+    async def delete_model(self, model_id: uuid.UUID):
+        async with PostgreSQLDatabase.get_session() as session:
+            model = await session.get(AiModels, model_id)
+            if model is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+            await session.delete(model)
+            await session.commit()
+            await self.get_all_models()

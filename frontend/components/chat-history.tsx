@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { use, useEffect, useRef, useState } from 'react';
 import { useVisibility } from './VisibilityContext';
 import { IconClose, IconEva } from '@/components/ui/icons';
 import { signOut } from 'next-auth/react';
@@ -32,6 +32,8 @@ import { TransitionGroup, CSSTransition } from 'react-transition-group';
 import { Ellipsis, EllipsisVertical, LogOut, Search, Settings, UserCog, UserRoundCog } from 'lucide-react';
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem } from './ui/context-menu';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import { useRouter } from 'next/navigation';
+import { set } from 'date-fns';
 interface ChatTitle {
   id: string;
   title: string;
@@ -53,10 +55,12 @@ interface ChatHistoryProps {
 }
 
 const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, userImage, partner, chatId, chatService, getuId_token, back_auth, onNewChatClick, onOldChatClick }) => {
+  const router = useRouter();
   const { chatHistoryVisible } = useVisibility();
   const { toggleChatHistoryVisibility } = useVisibility();
   const [chatTitles, setChatTitles] = useState<ChatTitle[]>([]); // State to store chat titles
   const [isFetchingChatTitles, setIsFetchingChatTitles] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast()
   const [title, setTitle] = useState("");
   const fetchedRef = useRef(false);
@@ -97,6 +101,28 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     }
   };
 
+  // JWT Decoding and Validation Utilities
+  const decodeJWT = (token: string) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      console.error('Invalid JWT token:', error);
+      return null;
+    }
+  };
+
+  const checkAdmin = () => {
+    const decoded = decodeJWT(back_auth);
+    setIsAdmin(decoded.role === 'admin');
+  }
   const handleLogout = async () => {
     window.localStorage.clear();
     await signOut({ callbackUrl: '/login' }); // Redirects to the login page after logout
@@ -321,6 +347,10 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     return () => subscription.unsubscribe();
   }, [chatService]);
 
+  useEffect(() => {
+    checkAdmin();
+  }, [back_auth]);
+
   // Create or get a ref for a chat item
   const getOrCreateRef = (id: string) => {
     if (!nodeRefs.current.has(id)) {
@@ -531,14 +561,17 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem
+                className={`${isAdmin ? '' : 'hidden'}`}
+                onClick={() => { router.push('/admin') }}
+              >
                 <UserRoundCog /> Admin Dashboard
                 <DropdownMenuShortcut>⇧⌘A</DropdownMenuShortcut>
               </DropdownMenuItem>
               {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
-              <DropdownMenuItem>
+              {/* <DropdownMenuItem>
                 <Settings /> Settings
-              </DropdownMenuItem>
+              </DropdownMenuItem> */}
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut /> Log out
                 <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>

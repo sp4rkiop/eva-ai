@@ -1,7 +1,7 @@
 'use client';
 import { useInView } from 'react-intersection-observer';
 import { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, Users, Bot, BarChart4, Search, Trash2, Plus, Menu, X, } from 'lucide-react';
+import { LayoutDashboard, Users, Bot, BarChart4, Search, Trash2, Plus, Menu, X, User, ChevronDown, } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,13 @@ import { authenticateUser } from '@/lib/utils';
 import LoadingSpinner from '@/components/ui/loading-spinner';
 import { ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Checkbox } from '@/components/ui/checkbox';
+
 
 // Extend next-auth session type to include custom properties
 declare module "next-auth" {
@@ -57,6 +64,10 @@ interface Model {
   provider: string;
   is_active: boolean;
   model_type: string;
+  deployment_name: string;
+  api_key: string;
+  endpoint: string;
+  model_version: string;
 }
 interface ModelsData {
   page_size: number;
@@ -71,6 +82,97 @@ const chartConfig = {
     color: "hsl(var(--chart-1))",
   },
 } satisfies ChartConfig
+
+// ── Model edit form schema ───────────────────────────────────────────
+const modelSchema = z.object({
+  model_name: z.string().min(1),
+  provider: z.string().min(1),
+  model_type: z.string().min(1),
+  deployment_name: z.string().optional(),
+  api_key: z.string().optional(),
+  endpoint: z.string().optional(),
+  model_version: z.string().optional(),
+  is_active: z.boolean(),
+});
+
+type ModelFormData = z.infer<typeof modelSchema>;
+
+function EditableModelForm({
+  model,
+  isAdding,
+  onSave,
+}: {
+  model: ModelFormData;
+  isAdding: boolean;
+  onSave: (data: ModelFormData) => void;
+}) {
+  const form = useForm<ModelFormData>({
+    resolver: zodResolver(modelSchema),
+    defaultValues: model,
+    mode: "onChange",
+  });
+
+  useEffect(() => {
+    form.reset(model);                 // reset when a new model is passed
+  }, [model, form]);
+
+  /* Show button:
+     • ADD mode → all required fields valid
+     • EDIT mode → something changed (dirty)           */
+  const canSave = isAdding ? form.formState.isValid : form.formState.isDirty;
+
+  return (
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit((values) => {
+          onSave(values);
+          if (isAdding) form.reset(values);      // optional: clear dirty flag
+        })}
+        className="flex flex-wrap items-end gap-4"
+      >
+        {Object.keys(model).map((key) => (
+          <FormField
+            key={key}
+            name={key as keyof ModelFormData}
+            control={form.control}
+            render={({ field }) => (
+              <FormItem className="w-64">
+                <FormLabel className="capitalize">
+                  {key.replace(/_/g, " ")}
+                </FormLabel>
+                <FormControl>
+                  {key === 'is_active' ? (
+                    <div className="flex items-center space-x-2 h-10">
+                      <Checkbox
+                        checked={!!field.value}
+                        onCheckedChange={field.onChange}
+                        id="is_active"
+                      />
+                      <label htmlFor={`${key}-checkbox`} className="text-sm">
+                        {field.value ? 'Active' : 'Inactive'}
+                      </label>
+                    </div>
+                  ) : (
+                    <Input
+                      {...field}
+                      value={field.value as string || ''}
+                    />
+                  )}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ))}
+        {canSave && (
+          <Button type="submit" className="h-10 mt-6">
+            Save
+          </Button>
+        )}
+      </form>
+    </Form>
+  );
+}
 
 function getTimeElapsed(lastActive: Date): string {
   const now = new Date();
@@ -131,6 +233,8 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeRange, setTimeRange] = useState("90d")
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedModel, setSelectedModel] = useState<any>(null);
+  const [addingModel, setAddingModel] = useState(false);
   const [userSearch, setUserSearch] = useState('');
   const [modelSearch, setModelSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -245,7 +349,104 @@ export default function AdminDashboard() {
         });
       } else if (res.status === 200) {
         const data = await res.json();
+        setSelectedUser(null);
         setUsers(data);
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+  const modifyUser = async (user_id: string, payload: {}) => {
+    if (!session?.back_auth) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/users/${user_id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        setSelectedUser(null);
+        fetchUsers(pageSize, '', '');
+        toast({
+          variant: 'default',
+          title: 'Success',
+          description: 'User data updated successfully.',
+          duration: 3000,
+        })
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  const deleteUser = async (user_id: string) => {
+    if (!session?.back_auth) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/users/${user_id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 204) {
+        toast({
+          variant: 'default',
+          title: 'Success',
+          description: `User deleted successfully.`,
+          duration: 3000,
+        })
+        fetchUsers(pageSize, '', '');
+        setSelectedUser(null);
       } else {
         throw new Error(`Unexpected status code ${res.status}`);
       }
@@ -291,6 +492,7 @@ export default function AdminDashboard() {
         });
       } else if (res.status === 200) {
         const data = await res.json();
+        setSelectedModel(null);
         setModels(data);
       } else {
         throw new Error(`Unexpected status code ${res.status}`);
@@ -307,6 +509,151 @@ export default function AdminDashboard() {
       });
     }
   };
+
+  const addModel = async (payload: ModelFormData) => {
+    if (!session?.back_auth) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/models`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        toast({
+          variant: 'default',
+          title: 'Success',
+          description: `Model added successfully: ${await res.text()}`,
+          duration: 3000,
+        })
+        fetchModels(pageSize, '', '');
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  const deleteModel = async (model_id: string) => {
+    if (!session?.back_auth) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/models/${model_id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 204) {
+        toast({
+          variant: 'default',
+          title: 'Success',
+          description: `Model deleted successfully.`,
+          duration: 3000,
+        })
+        setSelectedModel(null);
+        fetchModels(pageSize, '', '');
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  const modifyModel = async (model_id: string, payload: {}) => {
+    if (!session?.back_auth) return;
+
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/analytics/models/${model_id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.back_auth}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      // ── Handle responses ───────────────────────────────────────────────────
+      if (res.status === 401) {
+        toast({
+          variant: 'destructive',
+          title: 'Session expired',
+          description: 'Please refresh the page to continue.',
+          duration: 3000,
+        });
+      } else if (res.status === 200) {
+        fetchModels(pageSize, '', '');
+      } else {
+        throw new Error(`Unexpected status code ${res.status}`);
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Network error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Unable to retrieve analytics.',
+        duration: 3000,
+      });
+    }
+  };
+
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
 
   // Initialize analytics service when authenticated
   useEffect(() => {
@@ -343,9 +690,13 @@ export default function AdminDashboard() {
           currentAuth = back_auth;
           currentUserId = userid;
         }
-        // Set auth token and user ID -> init analytics service
-        if (currentAuth && currentUserId) {
-          fetchHomeData();
+
+        const decoded = decodeJWT(currentAuth);
+        if (decoded.role !== 'admin') {
+          setIsInitialized(false);
+          router.push('/?error=unauthorized');
+        }else {
+          await fetchHomeData();
         }
       } catch (error) {
         toast({
@@ -378,7 +729,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (usersInView && users_data.users.length === 0) {
-      fetchUsers(pageSize);                    // 👈 pick a sensible page size
+      fetchUsers(pageSize);
     }
   }, [usersInView]);
 
@@ -708,6 +1059,7 @@ export default function AdminDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
+                      <TableHead>Partner</TableHead>
                       <TableHead>Last Active</TableHead>
                       <TableHead>Chats</TableHead>
                       <TableHead>Tokens</TableHead>
@@ -721,13 +1073,14 @@ export default function AdminDashboard() {
                           <div className="font-medium">{user.first_name} {user.last_name}</div>
                           <div className="text-sm ">{user.email}</div>
                         </TableCell>
+                        <TableCell className="capitalize">{user.partner.split('-')[0]}</TableCell>
                         <TableCell className="truncate">{user.latest_activity ? getTimeElapsed(new Date(user.latest_activity)) : 'N/A'}</TableCell>
                         <TableCell>{user.chat_count}</TableCell>
                         <TableCell>{(user.total_tokens / 1000).toFixed(1)}k</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {user.models_sub.map((model) => (
-                              <Badge key={model.model_id} variant="outline" className="truncate">
+                              <Badge key={model.model_id} variant="outline" className="capitalize truncate" title={model.model_name}>
                                 {model.model_name}
                               </Badge>
                             ))}
@@ -802,8 +1155,8 @@ export default function AdminDashboard() {
                   <TableBody>
                     {models_data.models.map((model) => (
                       <TableRow key={model.model_id}>
-                        <TableCell className="font-medium">{model.model_name}</TableCell>
-                        <TableCell>{model.provider}</TableCell>
+                        <TableCell className="font-medium truncate capitalize">{model.model_name}</TableCell>
+                        <TableCell className="capitalize">{model.provider}</TableCell>
                         <TableCell>
                           <Badge
                             className={`capitalize ${model.is_active === true ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
@@ -823,7 +1176,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={!models_data.prev_cursor}
-                        onClick={() => models_data.prev_cursor && fetchUsers(pageSize, "", models_data.prev_cursor)}
+                        onClick={() => models_data.prev_cursor && fetchModels(pageSize, "", models_data.prev_cursor)}
                       >
                         Previous
                       </Button>
@@ -833,7 +1186,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={!models_data.next_cursor}
-                        onClick={() => models_data.next_cursor && fetchUsers(pageSize, "", models_data.next_cursor)}
+                        onClick={() => models_data.next_cursor && fetchModels(pageSize, "", models_data.next_cursor)}
                       >
                         Next
                       </Button>
@@ -849,10 +1202,6 @@ export default function AdminDashboard() {
           <div className="p-4 md:p-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h1 className="text-xl md:text-2xl font-bold">User Management</h1>
-              {/* <Button className="whitEditespace-nowrap self-end">
-                <Plus className="w-4 h-4 mr-2" />
-                Add User
-              </Button> */}
             </div>
 
             <Card ref={usersRef}>
@@ -884,6 +1233,7 @@ export default function AdminDashboard() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
+                      <TableHead>Partner</TableHead>
                       <TableHead>Last Active</TableHead>
                       <TableHead>Chats</TableHead>
                       <TableHead>Tokens</TableHead>
@@ -898,17 +1248,14 @@ export default function AdminDashboard() {
                           <div className="font-medium ">{user.first_name} {user.last_name}</div>
                           <div className="text-sm ">{user.email}</div>
                         </TableCell>
+                        <TableCell className="capitalize">{user.partner.split('-')[0]}</TableCell>
                         <TableCell className="truncate">{user.latest_activity ? getTimeElapsed(new Date(user.latest_activity)) : 'N/A'}</TableCell>
                         <TableCell>{user.chat_count}</TableCell>
                         <TableCell>{(user.total_tokens / 1000).toFixed(1)}k</TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {user.models_sub.map(model => (
-                              <Badge
-                                key={model.model_id}
-                                variant="outline"
-                                className="truncate"
-                              >
+                              <Badge key={model.model_id} variant="outline" className="capitalize truncate" title={model.model_name}>
                                 {model.model_name}
                               </Badge>
                             ))}
@@ -916,12 +1263,9 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right justify-end">
                           <div className="flex justify-end">
-                            <Button size="sm" variant="outline" className="mr-2"
+                            <Button size="sm" variant="default"
                               onClick={() => setSelectedUser(user)}>
                               Details
-                            </Button>
-                            <Button size="sm" variant="destructive">
-                              Remove
                             </Button>
                           </div>
                         </TableCell>
@@ -979,7 +1323,11 @@ export default function AdminDashboard() {
                         <CardTitle>{selectedUser.first_name} {selectedUser.last_name}</CardTitle>
                         <p className='text-sm'>{selectedUser.email}</p>
                       </div>
-                      <Button variant="destructive" className="whitespace-nowrap">
+                      <Button variant="destructive" className="whitespace-nowrap"
+                        onClick={() => {
+                          deleteUser(selectedUser.user_id);
+                        }}
+                      >
                         <Trash2 className="mr-2" />
                         Delete User
                       </Button>
@@ -994,44 +1342,57 @@ export default function AdminDashboard() {
                             <Badge
                               key={model.model_id}
                               variant="outline"
-                              className="truncate"
+                              className="truncate capitalize"
                             >
                               {model.model_name}
                             </Badge>
                           ))}
                         </div>
                       </div>
-                      <Button className="whitespace-nowrap">
-                        <Plus className="mr-2" />
-                        Add Model
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="whitespace-nowrap">
+                            <Plus className="mr-2" />
+                            Add Subscription
+                            <ChevronDown className="ml-auto h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                          {models_data.models.filter(model => !selectedUser.models_sub.find((subModel: any) => subModel.model_id === model.model_id))
+                            .map((model: any) => (
+                              <DropdownMenuItem
+                                className='truncate capitalize'
+                                key={model.model_id}
+                                onClick={() => modifyUser(selectedUser.user_id, { model_id: model.model_id })}
+                              >
+                                {model.model_name}
+                              </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
-                    <h3 className="font-medium  mb-3">Chat History</h3>
-                    {/* <Table className="overflow-x-auto">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Chat Title</TableHead>
-                          <TableHead>Tokens Used</TableHead>
-                          <TableHead>Last Activity</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedUser.chatHistory.map((chat: any) => (
-                          <TableRow key={chat.id}>
-                            <TableCell className="font-medium ">
-                              {chat.title}
-                            </TableCell>
-                            <TableCell className="">
-                              {chat.tokens.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="">
-                              {chat.lastActivity}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table> */}
+                    <h3 className="font-medium  mb-3">Change Role</h3>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-fit justify-start capitalize">
+                          <User className="mr-2" />
+                          {selectedUser.role}
+                          <ChevronDown className="ml-auto h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => modifyUser(selectedUser.user_id, { role: 'user' })}>
+                          User
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => modifyUser(selectedUser.user_id, { role: 'premium' })}>
+                          Premium
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => modifyUser(selectedUser.user_id, { role: 'admin' })}>
+                          Admin
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </CardContent>
                 </Card>
               </div>
@@ -1044,7 +1405,22 @@ export default function AdminDashboard() {
           <div className="p-4 md:p-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
               <h1 className="text-xl md:text-2xl font-bold">AI Model Management</h1>
-              <Button className="whitespace-nowrap self-end">
+              <Button
+                className="whitespace-nowrap self-end"
+                onClick={() => {
+                  setSelectedModel({      // blank values
+                    model_name: "",
+                    deployment_name: "",
+                    model_type: "",
+                    model_version: "",
+                    provider: "",
+                    api_key: "",
+                    endpoint: "",
+                    is_active: false
+                  });
+                  setAddingModel(true);    // flag “add” mode
+                }}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Model
               </Button>
@@ -1087,8 +1463,8 @@ export default function AdminDashboard() {
                   <TableBody>
                     {models_data.models.map((model) => (
                       <TableRow key={model.model_id}>
-                        <TableCell className="font-medium truncate">{model.model_name}</TableCell>
-                        <TableCell>{model.provider}</TableCell>
+                        <TableCell className="font-medium truncate capitalize">{model.model_name}</TableCell>
+                        <TableCell className="capitalize">{model.provider}</TableCell>
                         <TableCell>
                           <Badge
                             className={`capitalize ${model.is_active === true ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}
@@ -1098,11 +1474,9 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell className="text-right justify-end">
                           <div className="flex justify-end">
-                            <Button size="sm" variant="outline" className="mr-2">
+                            <Button size="sm" variant="default" className="mr-2"
+                              onClick={() => setSelectedModel(model)}>
                               Edit
-                            </Button>
-                            <Button size="sm" variant="destructive">
-                              Remove
                             </Button>
                           </div>
                         </TableCell>
@@ -1118,7 +1492,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={!models_data.prev_cursor}
-                        onClick={() => models_data.prev_cursor && fetchUsers(pageSize, "", models_data.prev_cursor)}
+                        onClick={() => models_data.prev_cursor && fetchModels(pageSize, "", models_data.prev_cursor)}
                       >
                         Previous
                       </Button>
@@ -1128,7 +1502,7 @@ export default function AdminDashboard() {
                         variant="outline"
                         size="sm"
                         disabled={!models_data.next_cursor}
-                        onClick={() => models_data.next_cursor && fetchUsers(pageSize, "", models_data.next_cursor)}
+                        onClick={() => models_data.next_cursor && fetchModels(pageSize, "", models_data.next_cursor)}
                       >
                         Next
                       </Button>
@@ -1137,6 +1511,56 @@ export default function AdminDashboard() {
                 </Pagination>
               </CardContent>
             </Card>
+
+            {/* Model Detail View */}
+            {selectedModel && (
+              <div className="mt-8">
+                <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center mb-4">
+                  <h2 className="text-lg md:text-xl font-bold truncate capitalize">
+                    {selectedModel.model_name ? `${selectedModel.model_name}'s Details` : 'New Model'}
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    onClick={() => { setSelectedModel(null); setAddingModel(false); }}
+                  >
+                    Close
+                  </Button>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-row justify-between gap-4">
+                      <div>
+                        <CardTitle className="truncate capitalize">{selectedModel.model_name}</CardTitle>
+                        <p className='text-sm capitalize'>{selectedModel.provider}</p>
+                      </div>
+                      {selectedModel.model_name && (
+                        <Button variant="destructive" className="whitespace-nowrap"
+                          onClick={() => {
+                            deleteModel(selectedModel.model_id);
+                          }}
+                        >
+                          <Trash2 className="mr-2" />
+                          Delete Model
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <EditableModelForm
+                      model={selectedModel}
+                      isAdding={addingModel}
+                      onSave={(data) => {
+                        addingModel ? addModel(data) : modifyModel(selectedModel.model_id, data);
+                        setAddingModel(false);         // reset flag after save
+                        setSelectedModel(null);        // close form if you like
+                      }}
+                    />
+                  </CardContent>
+
+                </Card>
+              </div>
+            )}
           </div>
         )}
       </div>
