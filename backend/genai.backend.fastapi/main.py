@@ -8,7 +8,7 @@ from core.curl_cffi_session_manager import CurlCFFIAsyncSession
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from repositories.websocket_manager import ws_manager
-from dependencies.auth_dependencies import get_current_user, authenticate_websocket
+from dependencies.auth_dependencies import auth_user_role, get_current_user, authenticate_websocket
 from services.management_service import ManagementService
 from api.v1.endpoints import user, chat, analytics
 
@@ -53,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         payload = await authenticate_websocket(websocket)
         if payload:
-            sid = uuid.UUID(payload["sid"])
+            sid = uuid.UUID(payload["user_id"])
             await ws_manager.connect(websocket, sid)
             try:
                 while True:
@@ -68,4 +68,4 @@ async def websocket_endpoint(websocket: WebSocket):
 # Include routers
 app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"], dependencies=[Depends(get_current_user)])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"], dependencies=[Depends(auth_user_role)])

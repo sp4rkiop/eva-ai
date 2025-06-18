@@ -48,7 +48,7 @@ interface ChatHistoryProps {
   partner: string;
   chatId: string | undefined;
   chatService: ChatService;
-  getuId_token: () => Promise<string | null>;
+  getuId_token: () => Promise<void>;
   back_auth: string;
   onNewChatClick: () => void;
   onOldChatClick: (iD?: string) => void;
@@ -286,7 +286,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     .map(([name, chats]) => ({ name, chats }));
 
   useEffect(() => {
-    const getConversations = async (newToken?: string | null): Promise<void> => {
+    const getConversations = async (): Promise<void> => {
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations`, {
           method: "GET",
@@ -302,8 +302,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             description: "Token expired. Trying to refresh. Code: " + response.status,
             duration: 1500
           });
-          const newToken = await getuId_token();
-          return getConversations(newToken);
+          await getuId_token();
+          return getConversations();
         }
         const data = await response.json();
         if (data != null && data.length != 0) {

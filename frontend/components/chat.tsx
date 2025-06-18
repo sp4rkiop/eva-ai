@@ -54,6 +54,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const userInteractedRef = useRef(userInteracted);
   const isAtBottomRef = useRef(isAtBottom);
+  const refreshTryCount = useRef(0);
   const { toast } = useToast();
 
   // Add hover state for message actions
@@ -72,7 +73,10 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
   }, []);
 
   const getuId_token = async () => {
+    if ( refreshTryCount.current >= 2) return;
     try {
+      refreshTryCount.current += 1;
+      
       const userData = {
         email_id: uMail,
         first_name: fName,
@@ -87,9 +91,6 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         back_auth: back_auth,
         userid: userid,
       });
-
-      // Return the token
-      return back_auth;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : "There was a problem verifying your account.");
     }

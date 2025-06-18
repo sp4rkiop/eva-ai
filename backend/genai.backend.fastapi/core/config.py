@@ -7,6 +7,8 @@ load_dotenv()
 class Settings(BaseSettings):
     DEFAULT_MODEL_ID: str = "1"
     CORS_ALLOWED_HOSTS: str = "http://localhost:8000"
+    COOKIE_SECURE: bool = True
+    SESSION_COOKIE_NAME: str = "ebe"
     JWT_SECRET_KEY: str = "secret@123"
     RATE_LIMIT_ADMIN: int = 60
     RATE_LIMIT_USER: int = 14

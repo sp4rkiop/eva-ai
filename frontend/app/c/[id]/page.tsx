@@ -60,6 +60,7 @@ export default function IndexPage() {
   const [isInitialized, setIsInitialized] = useState(false);
   const chatService = useMemo(() => ChatService.getInstance(), []);
   const isRefreshing = useRef(false); // Add ref to track refresh state
+  const refreshTryCount = useRef(0);
   const { toast } = useToast();
   
     // Redirect unauthenticated users
@@ -72,7 +73,7 @@ export default function IndexPage() {
     // Initialize chat service when authenticated
     useEffect(() => {
       const initializeChatService = async () => {
-        if (!session || status !== 'authenticated' || isRefreshing.current) return;
+        if (!session || status !== 'authenticated' || isRefreshing.current || refreshTryCount.current >= 2) return;
         try {
           isRefreshing.current = true;
           let currentAuth = session.back_auth;
@@ -80,6 +81,7 @@ export default function IndexPage() {
 
           // Refresh token if expired
           if (currentAuth && isTokenExpired(currentAuth)) {
+            refreshTryCount.current += 1;
             toast({
               description: "Token expired. Refreshing token...",
               duration: 1500

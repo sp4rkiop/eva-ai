@@ -4,6 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 from core.config import settings
+from core.redis_cache import RedisCache
 
 security = HTTPBearer()
 
@@ -26,7 +27,16 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     try:
         return await verify_jwt_token(token)
     except ValueError:
-        raise HTTPException(status_code=401, detail="Invalid authorization header format")
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    
+async def auth_user_role(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+
+    # Split the header to extract the token part
+    try:
+        return await verify_jwt_token(token, check_role=True)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid authorization format")
     
 async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any]]:
     """
@@ -65,7 +75,7 @@ async def authenticate_websocket(websocket: WebSocket) -> Optional[Dict[str, Any
         return None
 
 
-async def verify_jwt_token(token: str) -> Dict[str, Any]:
+async def verify_jwt_token(token: str, check_role: Optional[bool] = False) -> Dict[str, Any]:
     """
     Verify JWT token and return payload
     
@@ -83,9 +93,19 @@ async def verify_jwt_token(token: str) -> Dict[str, Any]:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
         
         # Check if token has required claims
-        if not payload or "sid" not in payload:
-            raise HTTPException(status_code=403, detail="Could not validate credentials")
-            
+        if not payload or "jti" not in payload:
+            raise HTTPException(status_code=401, detail="Could not validate credentials")
+        
+        redis = RedisCache.get_connection()
+        # Check if token is valid / revoked
+        if not await redis.exists(payload["jti"]):
+            raise HTTPException(status_code=401, detail="Credentials have been revoked")
+        
+        # Check if role is required and user has correct role
+        if check_role:
+            if "role" not in payload or payload["role"] != "admin":
+                raise HTTPException(status_code=403, detail="Not authorized")
+
         return payload
     except JWTError:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
+        raise HTTPException(status_code=401, detail="Could not validate credentials")

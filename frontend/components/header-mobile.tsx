@@ -21,7 +21,7 @@ interface Model {
 interface HeaderProps {
   service: ChatService;
   onNewChatClick: () => void;
-  getuId_token: () => Promise<string | null>;
+  getuId_token: () => Promise<void>;
   back_auth: string;
 }
 
@@ -33,7 +33,7 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
   const { toast } = useToast();
 
   useEffect(() => {
-    const getModels = async (newToken?: string | null): Promise<void> => {
+    const getModels = async (): Promise<void> => {
       try{
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/models`, {
           method: "GET",
@@ -49,8 +49,8 @@ const HeaderMobile: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_t
             description: "Token expired. Trying to refresh. Code: " + response.status,
             duration: 1500
           });
-          const newToken = await getuId_token();
-          return getModels(newToken);
+          await getuId_token();
+          return getModels();
         }
         const data = await response.text();
         if(data!=null && data.length!= 0) {

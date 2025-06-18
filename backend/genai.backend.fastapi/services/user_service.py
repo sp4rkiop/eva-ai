@@ -1,8 +1,10 @@
+import json
 from fastapi import HTTPException
-import uuid, logging, pickle
+import uuid, logging, pickle, secrets
 from jose import jwt
 from pydantic import EmailStr
 from sqlalchemy import update
+from core.redis_cache import RedisCache
 from core.database import PostgreSQLDatabase
 from core.config import settings
 from typing import Dict, List, Any, Optional
@@ -14,14 +16,16 @@ from models.users_model import Users
 from models.chat_history_model import ChatHistory
 from models.ai_models_model import AiModels
 from models.subscriptions_model import Subscriptions
-from repositories.cache_repository import CacheRepository
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class UserService:
-
+    def __init__(self):
+        self.redis = RedisCache.get_connection()
+        self.USER_SESSIONS_PREFIX = "user_sessions:"
+        self.SESSION_EXPIRY = timedelta(days=1)
 
     async def get_create_user(self, email_id: EmailStr, first_name: Optional[str], 
                              last_name: Optional[str], partner: str) -> Dict[str, Any]:
@@ -49,7 +53,7 @@ class UserService:
                 user = result.scalar_one_or_none()
                 
                 if user:
-                    token = self._generate_jwt_token(user.user_id, user.role)
+                    token = await self._generate_jwt_token(user.user_id, user.role)
                     return {
                         "user_id": user.user_id,
                         "token": token
@@ -73,7 +77,7 @@ class UserService:
                 )
                 session.add(new_sub)
 
-                token = self._generate_jwt_token(new_user.user_id, new_user.role)
+                token = await self._generate_jwt_token(new_user.user_id, new_user.role)
                 # Build response before commit to include all data
                 response = {
                     "user_id": new_user.user_id,
@@ -96,7 +100,7 @@ class UserService:
                 user = result.scalar_one_or_none()
                 
                 if user:
-                    token = self._generate_jwt_token(user.user_id, user.role)
+                    token = await self._generate_jwt_token(user.user_id, user.role)
                     return {
                         "user_id": user.user_id,
                         "token": token
@@ -109,11 +113,91 @@ class UserService:
             except Exception as e:
                 await session.rollback()
                 logger.exception(f"User operation failed: {e}", exc_info=True)
-                raise RuntimeError("User operation failed") from e
+                raise RuntimeError("User operation failed") from e    
 
+    async def _generate_cookie_token(self, user_id: uuid.UUID, role: str) -> str:
+        """
+        Generate a session cookie token, store session data,
+        and update the per‑user session index.
+        
+        Args:
+            user_id: User's UUID
+            
+        Returns:
+            Cookie token string
+        """
+        token = secrets.token_urlsafe(32)
 
-    @staticmethod
-    def _generate_jwt_token( user_id: uuid.UUID, role: str) -> str:
+        # Store session data
+        await self.redis.set(
+            name=token, 
+            value=json.dumps({"user_id": str(user_id), "role": role}), 
+            ex=self.SESSION_EXPIRY
+        )
+
+        # Update per-user session index
+        await self._update_user_session_index(user_id, token)
+
+        return token
+    
+    async def _update_user_session_index(self, user_id: uuid.UUID, cookie_token: str) -> bool:
+        """
+        Add a session token to user's session list.
+        
+        Args:
+            user_id: User's UUID
+            cookie_token: Session token to add
+            
+        Returns:
+            bool: True if added successfully, False if already exists
+        """
+        user_sessions_key = f"{self.USER_SESSIONS_PREFIX}{str(user_id)}"
+        
+        # Use pipeline for atomic operations
+        pipe = self.redis.pipeline()
+        pipe.sadd(user_sessions_key, cookie_token)
+        pipe.expire(user_sessions_key, self.SESSION_EXPIRY)
+        
+        results = await pipe.execute()
+        return bool(results[0])  # sadd returns 1 if new, 0 if already exists
+    
+    async def delete_all_user_sessions(self, user_id: uuid.UUID) -> int:
+        """
+        Delete all sessions for a user.
+        
+        Args:
+            user_id: User's UUID
+            
+        Returns:
+            int: Number of sessions deleted
+        """
+        user_sessions_key = f"{self.USER_SESSIONS_PREFIX}{str(user_id)}"
+        
+        # Get all session tokens
+        session_tokens = await self.redis.smembers(user_sessions_key) # type: ignore
+        
+        if not session_tokens:
+            return 0
+        
+        # Prepare keys for deletion
+        session_keys = [token for token in session_tokens]
+        
+        # Use pipeline for atomic operations
+        pipe = self.redis.pipeline()
+        
+        # Delete all session data
+        if session_keys:
+            pipe.delete(*session_keys)
+        
+        # Delete user sessions set
+        pipe.delete(user_sessions_key)
+        
+        results = await pipe.execute()
+        
+        # Return number of actual sessions deleted (first operation result)
+        return results[0] if session_keys else 0
+
+    async def _generate_jwt_token(self, user_id: uuid.UUID, role: str) -> str:
         """
         Generate a JWT token for the user.
         
@@ -125,13 +209,27 @@ class UserService:
             JWT token string
         """
         key = settings.JWT_SECRET_KEY
+        now = datetime.now(UTC)
+        jti = secrets.token_urlsafe(32) # 32‑char unique ID
         payload = {
-            "sid": str(user_id),
+            "user_id": str(user_id),
             "role": role,
-            "iat": datetime.now(UTC).timestamp(),
-            "exp": (datetime.now(UTC) + timedelta(days=1)).timestamp()
+            "jti": jti,
+            "iat": int(now.timestamp()),
+            "exp": int((now + self.SESSION_EXPIRY).timestamp()),
         }
-        return jwt.encode(payload, key, algorithm='HS256')
+        token = jwt.encode(payload, key, algorithm='HS256')
+        # Store session data
+        await self.redis.set(
+            name=jti, 
+            value="", 
+            ex=self.SESSION_EXPIRY
+        )
+
+        # Update per-user session index
+        await self._update_user_session_index(user_id, jti)
+
+        return token
 
     async def get_conversations(self, user_id: uuid.UUID) -> List[Dict[str, Any]]:
         """
@@ -252,9 +350,9 @@ class UserService:
         """
         cache_key = f"model_sub_{user_id}_{model_id}"
         try:
-            model_sub = CacheRepository.get(cache_key)
+            model_sub = await self.redis.get(cache_key)
             if model_sub is not None:
-                return model_sub
+                return bool(int(model_sub))
             async with PostgreSQLDatabase.get_session() as session:
                 # Query subscriptions with joined model details
                 stmt = (
@@ -270,11 +368,11 @@ class UserService:
                 # Extract model details from relationships
                 is_subscribed = len(subscriptions) > 0
             if is_subscribed:
-                CacheRepository.set(cache_key, is_subscribed, 14400)  # Cache for 4 hours
+                await self.redis.set(cache_key, int(is_subscribed), 14400)  # Cache for 4 hours
             return is_subscribed
         except Exception as e:
             logger.exception(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}", exc_info=True)
-            raise Exception(f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}")
+            raise Exception(f"Failed to check if model is subscribed.")
 
     async def rename_conversation(self, user_id: uuid.UUID, chat_id: uuid.UUID, new_title: str) -> bool:
         """

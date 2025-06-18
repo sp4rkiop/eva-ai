@@ -230,6 +230,8 @@ export default function AdminDashboard() {
   const { data: session, status, update } = useSession();
   const [isInitialized, setIsInitialized] = useState(false);
   const isRefreshing = useRef(false); // Add ref to track refresh state
+  const refreshingSession = useRef(false);
+  const refreshTryCount = useRef(0);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [timeRange, setTimeRange] = useState("90d")
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -270,6 +272,31 @@ export default function AdminDashboard() {
     return date >= startDate
   })
 
+  const refreshToken = async () => {
+    if (refreshingSession.current || refreshTryCount.current >= 2) return;
+    try {
+      refreshingSession.current = true;
+      refreshTryCount.current += 1;
+      const [fstNam, lstNam] = session?.user?.name?.split(' ') ?? ['', ''];
+      const userData = {
+        email_id: session?.user?.email || 'noemail@eva',
+        first_name: fstNam,
+        last_name: lstNam,
+        partner: session?.partner || 'Eva',
+      };
+
+      const { back_auth, userid } = await authenticateUser(userData);
+
+      // Throw error if we don't get a valid token
+      if (!back_auth || back_auth.trim() === '') {
+        throw new Error('No authentication token received from server');
+      }
+
+      await update({ back_auth, userid });
+    } finally {
+      refreshingSession.current = false;
+    }
+  }
   const fetchHomeData = async () => {
     if (!session?.back_auth) return;
     isRefreshing.current = true;
@@ -290,9 +317,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         const data = await res.json();
 
@@ -344,9 +372,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         const data = await res.json();
         setSelectedUser(null);
@@ -387,9 +416,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         setSelectedUser(null);
         fetchUsers(pageSize, '', '');
@@ -435,9 +465,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 204) {
         toast({
           variant: 'default',
@@ -487,9 +518,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         const data = await res.json();
         setSelectedModel(null);
@@ -531,9 +563,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         toast({
           variant: 'default',
@@ -578,9 +611,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 204) {
         toast({
           variant: 'default',
@@ -627,9 +661,10 @@ export default function AdminDashboard() {
         toast({
           variant: 'destructive',
           title: 'Session expired',
-          description: 'Please refresh the page to continue.',
+          description: 'Refreshing session.',
           duration: 3000,
         });
+        await refreshToken();
       } else if (res.status === 200) {
         fetchModels(pageSize, '', '');
       } else {
@@ -695,7 +730,7 @@ export default function AdminDashboard() {
         if (decoded.role !== 'admin') {
           setIsInitialized(false);
           router.push('/?error=unauthorized');
-        }else {
+        } else {
           await fetchHomeData();
         }
       } catch (error) {

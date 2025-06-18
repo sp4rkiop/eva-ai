@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select, cast, Date
 from core.database import PostgreSQLDatabase
 from models.request_model import AiModel
+from services.user_service import UserService
 from utils.cursor_utils import encode_cursor, decode_cursor
 from repositories.cache_repository import CacheRepository
 from models.ai_models_model import AiModels
@@ -335,6 +336,8 @@ class ManagementService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
             if query_params.get('role'):
                 user.role = query_params['role'].lower() if query_params['role'].lower() in ['user', 'premium','admin'] else user.role
+                user_service = UserService()
+                await user_service.delete_all_user_sessions(user_id) # Delete all sessions for the user to force them to re-authenticate
             
             if query_params.get('model_id') is not None :
                 model_id = uuid.UUID(query_params['model_id']) if isinstance(query_params['model_id'], str) else query_params['model_id'] 
