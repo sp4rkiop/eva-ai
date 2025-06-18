@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "postgres"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = "dev_password"
     OPENROUTER_URI: str = "https://openrouter.ai/api/v1"
     OPENROUTER_TOKEN: str = "YOUR_OPENROUTER_TOKEN"
     AZURE_OPENAI_API_VERSION: str = "2024-10-21"
