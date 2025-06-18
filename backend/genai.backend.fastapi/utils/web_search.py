@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ScrapUrlListInput(BaseModel):
     url_list: List[str] = Field(..., description="List of URLs to scrape")
+    query: Optional[str] = Field(..., description="Search query for relevant (simple keyword match) content from scraped data")
     state: Annotated[dict, InjectedState]
 
 class SearchInput(BaseModel):
@@ -106,12 +107,13 @@ class WebSearchService:
             logger.exception(f"An error occurred while searching for {query} : {e}")
             return [{"error": f"Try again later. An error occurred while searching for {query} : {e}."}]
 
-    async def scrap_url_list(self, url_list: list[str], state: Optional[dict] = None) -> Optional[Dict[str, list[str]]]:
+    async def scrap_url_list(self, url_list: list[str], query: Optional[str], state: Optional[dict] = None) -> Optional[Dict[str, list[str]]]:
         """
         Scrap a list of URLs and return a dictionary with the URL as the key and the list of relevant chunks of scraped content as the value.
         It can fail if the URL is not valid or if the request fails. So do not spam it.
         Args:
-            url_list (list[str]): A list of URLs to be scraped
+            url_list (list[str]): A list of URLs to be scraped.
+            query (str): The search query string which will be used to get relevent (simple keyword match) content from scraped data.
 
         Returns:
             Optional[Dict[str, str]]: A dictionary with the scraped content, or None if an error occurred
@@ -153,7 +155,7 @@ class WebSearchService:
                     if result.status_code == 200:
                         user_query = ""
                         if state: 
-                            user_query = state["user_input"]
+                            user_query = query if query else state["user_query"]
                             await ws_manager.send_to_user(
                                 sid=state["user_id"],
                                 message_type="ToolProcess",
