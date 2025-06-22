@@ -1341,7 +1341,7 @@ export default function AdminDashboard() {
               <div className="mt-8">
                 <div className="flex flex-col md:flex-row justify-between gap-4 md:items-center mb-4">
                   <h2 className="text-lg md:text-xl font-bold">
-                    {selectedUser.first_name} {selectedUser.last_name}'s Details
+                    {selectedUser.first_name} {selectedUser.last_name}&apos;s Details
                   </h2>
                   <Button
                     variant="ghost"
