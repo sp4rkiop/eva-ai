@@ -18,3 +18,4 @@ uvicorn[standard]
 websockets
 apscheduler
 redis
+aiofiles
