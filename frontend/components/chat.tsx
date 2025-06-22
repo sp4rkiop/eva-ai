@@ -97,6 +97,8 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         back_auth: back_auth,
         userid: userid,
       });
+
+      return back_auth;
     } catch (error) {
       throw new Error(error instanceof Error ? error.message : "There was a problem verifying your account.");
     }
@@ -324,7 +326,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           },
         })
           .then((response) =>
-            response.status === 401 ? getuId_token() : response.json())
+            response.status === 401 ? getuId_token().then(() => window.location.reload()) : response.json())
           .then((data) => {
             const rawMessages = data?.conversation?.main?.messages || [];
             const tokensConsumed = data?.tokensConsumed || 0;

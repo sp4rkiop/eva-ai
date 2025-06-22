@@ -12,7 +12,7 @@ pydantic[email]
 python-jose
 asyncpg
 pgvector
-pdfminer
+pdfminer.six
 sqlalchemy[asyncio]
 uvicorn[standard]
 websockets
@@ -22,3 +22,13 @@ aiofiles
 pypdf
 python-multipart
 unstructured
+pi_heif
+pillow
+pdf2image
+unstructured.pytesseract
+networkx
+pandas
+openpyxl
+python-docx
+python-pptx
+numpy

@@ -48,7 +48,7 @@ interface ChatHistoryProps {
   partner: string;
   chatId: string | undefined;
   chatService: ChatService;
-  getuId_token: () => Promise<void>;
+  getuId_token: () => Promise<string | undefined>;
   back_auth: string;
   onNewChatClick: () => void;
   onOldChatClick: (iD?: string) => void;
@@ -64,7 +64,6 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
   const { toast } = useToast()
   const [title, setTitle] = useState("");
   const fetchedRef = useRef(false);
-
   // Search functionality states
   const [showSearch, setShowSearch] = useState(false);
   const [searchText, setSearchText] = useState("");
@@ -128,7 +127,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     await signOut({ callbackUrl: '/login' }); // Redirects to the login page after logout
   };
 
-  const handleRename = (chatId: string, newTitle: string) => {
+  const handleRename = (chatId: string, newTitle: string, back_auth?: string) => {
     try {
       fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}?title=${newTitle}`, {
         method: "PATCH",
@@ -143,8 +142,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             description: "Token expired. Trying to refresh. Code: " + res.status,
             duration: 1500
           });
-          await getuId_token();
-          return handleRename(chatId, newTitle);
+          back_auth = await getuId_token();
+          return handleRename(chatId, newTitle, back_auth);
         } else if (res.status === 204) {
           toast({
             description: "Chat title updated",
@@ -179,7 +178,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     }
   };
 
-  const handleDelete = (chatId: string) => {
+  const handleDelete = (chatId: string, back_auth?: string) => {
     try {
       fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${chatId}`, {
         method: "PATCH",
@@ -196,8 +195,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             description: "Token expired. Trying to refresh. Code: " + res.status,
             duration: 1500
           });
-          await getuId_token();
-          return handleDelete(chatId);
+          back_auth = await getuId_token();
+          return handleDelete(chatId, back_auth);
         } else if (res.status === 204) {
           toast({
             description: "Chat deleted",
@@ -286,7 +285,8 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     .map(([name, chats]) => ({ name, chats }));
 
   useEffect(() => {
-    const getConversations = async (): Promise<void> => {
+    const getConversations = async (back_auth?: string): Promise<void> => {
+      if (!back_auth) return;
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations`, {
           method: "GET",
@@ -302,8 +302,9 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             description: "Token expired. Trying to refresh. Code: " + response.status,
             duration: 1500
           });
-          await getuId_token();
-          return getConversations();
+          back_auth = await getuId_token();
+          if (!back_auth) return;
+          return getConversations(back_auth);
         }
         const data = await response.json();
         if (data != null && data.length != 0) {
@@ -335,13 +336,13 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
     };
 
     if (!fetchedRef.current) {
-      getConversations();
+      getConversations(back_auth);
       fetchedRef.current = true;
     }
 
     // Subscribe to the endStream$ observable
-    const subscription = chatService.endStream$.subscribe(() => {
-      getConversations();
+    const subscription = chatService.endStream$.subscribe(async () => {
+      await getConversations(back_auth);
     });
     // Cleanup subscription on component unmount
     return () => subscription.unsubscribe();
@@ -471,7 +472,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                               </ContextMenuTrigger>
                               <ContextMenuContent>
                                 <DialogTrigger className="block w-full text-left text-sm"><ContextMenuItem>Rename</ContextMenuItem></DialogTrigger>
-                                <ContextMenuItem onClick={() => { handleDelete(chatTitle.id) }}>Delete</ContextMenuItem>
+                                <ContextMenuItem onClick={() => { handleDelete(chatTitle.id, back_auth) }}>Delete</ContextMenuItem>
                               </ContextMenuContent>
                             </ContextMenu>
                             {/* Dropdown menu for each chat title */}
@@ -484,7 +485,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                                   <DialogTrigger className="block w-full text-left text-sm">
                                     <DropdownMenuItem >Rename</DropdownMenuItem>
                                   </DialogTrigger>
-                                  <DropdownMenuItem onClick={() => { handleDelete(chatTitle.id) }}>
+                                  <DropdownMenuItem onClick={() => { handleDelete(chatTitle.id, back_auth) }}>
                                     Delete
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
@@ -511,7 +512,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                                 </div>
                                 <DialogFooter>
                                   <DialogClose asChild>
-                                    <Button type="button" className="w-fit ml-auto" onClick={() => { handleRename(chatTitle.id, title) }}>
+                                    <Button type="button" className="w-fit ml-auto" onClick={() => { handleRename(chatTitle.id, title, back_auth) }}>
                                       Save changes
                                     </Button>
                                   </DialogClose>
