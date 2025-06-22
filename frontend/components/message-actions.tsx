@@ -150,7 +150,7 @@ export const MessageActions = ({ role, content, conversationId, index, className
       )}
 
       {/* Regenerate Button - only shown for assistant messages */}
-      {role !== 'user' && (
+      {/* {role !== 'user' && (
         <Button
           variant="ghost"
           size="sm"
@@ -164,7 +164,7 @@ export const MessageActions = ({ role, content, conversationId, index, className
             <RefreshCw />
           )}
         </Button>
-      )}
+      )} */}
     </div>
   );
 };

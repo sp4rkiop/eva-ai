@@ -16,6 +16,8 @@ from models.users_model import Users
 from models.chat_history_model import ChatHistory
 from models.ai_models_model import AiModels
 from models.subscriptions_model import Subscriptions
+from models.user_document_model import UserDocument
+from services.document_service import DocumentService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(self):
+        self.doc_service = DocumentService()
         self.redis = RedisCache.get_connection()
         self.USER_SESSIONS_PREFIX = "user_sessions:"
         self.SESSION_EXPIRY = timedelta(days=1)
@@ -281,20 +284,41 @@ class UserService:
             async with PostgreSQLDatabase.get_session() as session:
                 # Query chat history
                 stmt = (
-                    select(ChatHistory)
+                    select(ChatHistory, UserDocument.document_id, UserDocument.file_name)
+                    .outerjoin(          # keep the chat row even if it has zero files
+                        UserDocument,
+                        UserDocument.chat_id == ChatHistory.chat_id,
+                    )
                     .where(
-                        (ChatHistory.user_id == user_id) &
-                        (ChatHistory.chat_id == chat_id) &
-                        (ChatHistory.visible == True)
+                        ChatHistory.user_id == user_id,
+                        ChatHistory.chat_id == chat_id,
+                        ChatHistory.visible.is_(True)
                     )
                 )
-                result = await session.execute(stmt)
-                chat = result.scalar_one_or_none()
-                if not chat:
+                rows = (await session.execute(stmt)).all()
+                if not rows:
                     raise HTTPException(status_code=404, detail="Conversation not found")
+                
+                # The first tuple always contains the ChatHistory object
+                chat: ChatHistory = rows[0][0]
+
+                # Collect unique files
+                files = [
+                    {"document_id": r.document_id, "file_name": r.file_name}
+                    for r in rows
+                    if r.document_id is not None          # row could be NULL when no files
+                ]
+                # optional: remove duplicates (when a file could appear twice)
+                # files = list({f["document_id"]: f for f in files}.values())
+
+                # Return payload
                 return {
+                    "id": chat.chat_id,
+                    "title": chat.chat_title,
+                    "last_activity": chat.last_updated,
                     "conversation": pickle.loads(chat.history_blob) if chat.history_blob else [],
-                    "token_consumed": chat.token_count
+                    "token_consumed": chat.token_count,
+                    "files": files,
                 }
         except HTTPException:
             raise

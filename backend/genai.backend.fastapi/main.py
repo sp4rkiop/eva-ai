@@ -10,7 +10,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from repositories.websocket_manager import ws_manager
 from dependencies.auth_dependencies import auth_user_role, get_current_user, authenticate_websocket
 from services.management_service import ManagementService
-from api.v1.endpoints import user, chat, analytics
+from api.v1.endpoints import user, chat, document, analytics
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -68,4 +68,5 @@ async def websocket_endpoint(websocket: WebSocket):
 # Include routers
 app.include_router(user.router, prefix="/api/v1/user", tags=["user"])
 app.include_router(chat.router, prefix="/api/v1/chat", tags=["chat"], dependencies=[Depends(get_current_user)])
+app.include_router(document.router, prefix="/api/v1/document", tags=["document"], dependencies=[Depends(get_current_user)])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"], dependencies=[Depends(auth_user_role)])

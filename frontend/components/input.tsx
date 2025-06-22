@@ -4,7 +4,7 @@ import { File, FileText, Loader2, Paperclip, X } from 'lucide-react';
 
 interface InputProps {
     isActive: boolean;
-    onSubmit: (text: string) => void;
+    onSubmit: (text: string, files?: File[]) => void;
     messagesLength: number;
     showSampleInput?: boolean;
 }
@@ -153,35 +153,11 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
-    // Dummy function for file upload API call
-    const dummyFileUpload = async (files: File[]) => {
-        console.log('Dummy file upload API called with files:', files.map(f => ({
-            name: f.name,
-            size: f.size,
-            type: f.type,
-            lastModified: new Date(f.lastModified)
-        })));
-
-        // Simulate API call
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                console.log('Files uploaded successfully (dummy)');
-                resolve(true);
-            }, 1000);
-        });
-    };
-
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
         if (text.trim().length > 0) {
-            onSubmit(text);
-
-            // If files are selected, upload them separately
-            if (selectedFiles.length > 0) {
-                dummyFileUpload(selectedFiles);
-            }
-
+            onSubmit(text, selectedFiles);
             setText('');
             setSelectedFiles([]);
             setIsTyping(false);
@@ -220,6 +196,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
                                     </p>
                                 </div>
                             </div>
+                            <Loader2 className="ml-2 animate-spin hidden" />
                             <button
                                 type="button"
                                 onClick={() => handleRemoveFile(index)}

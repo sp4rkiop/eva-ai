@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState, useRef } from 'react';
 import Input from './input';
 import ChatHistory from './chat-history';
 import Sidebar from './sidebar';
-import HeaderMobile from './header-mobile';
-import HeaderDesktop from './header-desktop';
+import Header from './header';
 import Greet from './greet';
 import { VisibilityProvider } from './VisibilityContext';
 import remarkGfm from 'remark-gfm'
@@ -22,6 +21,7 @@ import { authenticateUser } from '@/lib/utils';
 import { MessageActions } from './message-actions';
 import { Loader2 } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import DocumentManager from './document-manager';
 
 interface ChatProps {
   chatId?: string;
@@ -41,9 +41,15 @@ interface Message {
   isPlaceholder?: boolean;
 }
 
+interface Document {
+  document_id: string;
+  file_name: string;
+}
+
 const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, uImg, partner, userid, back_auth }) => {
   const { data: session, status, update } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [toolMessage, setToolMessage] = useState<string>("");
   const [currentChatId, setCurrentChatId] = useState<string | undefined>(chatId);
   const [loadingConversaion, setloadingConversaion] = useState<boolean>(false);
@@ -73,10 +79,10 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
   }, []);
 
   const getuId_token = async () => {
-    if ( refreshTryCount.current >= 2) return;
+    if (refreshTryCount.current >= 2) return;
     try {
       refreshTryCount.current += 1;
-      
+
       const userData = {
         email_id: uMail,
         first_name: fName,
@@ -96,7 +102,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
     }
   };
 
-  const handleMessageSubmit = async (text: string) => {
+  const handleMessageSubmit = async (text: string, files?: File[]) => {
     try {
       // Add user's input text as a message in the current chat
       const userMessage: Message = {
@@ -113,6 +119,10 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
       setMessages((prevMessages) => [...prevMessages, placeholderMessage]);
       setAssistantTyping(true);
 
+      let uploadChatId = undefined;
+      if (files && (files.length > 0)) {
+        uploadChatId = await handleFileUpload(files);
+      }
       var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/ai_request`, {
         method: 'POST',
         headers: {
@@ -122,13 +132,13 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         body: JSON.stringify({
           model_id: chatService.selectedModelId$.value,
           user_input: text,
-          chat_id: currentChatId
+          chat_id: currentChatId || uploadChatId
         })
       });
       if (!response.ok) {
         if (response.status === 401) {
           const newToken = await getuId_token();
-          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/Semantic`, {
+          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/ai_request`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -137,7 +147,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
             body: JSON.stringify({
               modelId: chatService.selectedModelId$.value,
               userInput: text,
-              chatId: currentChatId
+              chatId: currentChatId || uploadChatId
             })
           });
         } else {
@@ -147,7 +157,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
       const responseJson = await response.json();
       if (responseJson.success) {
         const newChatId = responseJson.chat_id;
-        if (newChatId != null && newChatId.length != 0) {
+        if (currentChatId === undefined && newChatId != null && newChatId.length != 0) {
           setCurrentChatId(newChatId);
           window.history.pushState({}, '', `/c/${newChatId}`);
         }
@@ -165,6 +175,90 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         variant: "destructive",
         title: "Uh oh! Something went wrong.",
         description: "Failed to send your message. Error: " + error as string,
+        duration: 1500
+      });
+      // console.error('Error:', error);
+    }
+  };
+
+  const handleFileUpload = async (files: File[]) => {
+    let chatId = currentChatId;
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/document/upload${chatId ? `?chat_id=${chatId}` : '' }`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${back_auth}`,
+          },
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Error uploading file: ${response.status} ${response.statusText}`);
+        }
+        const responseJson = await response.json();
+        if (responseJson.success) {
+          const newChatId = responseJson.chat_id;
+          if (currentChatId === undefined && newChatId != null && newChatId.length != 0) {
+            chatId = newChatId;
+            setCurrentChatId(newChatId);
+            window.history.pushState({}, '', `/c/${newChatId}`);
+          }
+          toast({
+            variant: "default",
+            title: `${file.name} uploaded successfully.`,
+            duration: 1500
+          })
+        } else {
+          const errorMessage = responseJson.error_message;
+          toast({
+            variant: "destructive",
+            title: "Uh oh! Something went wrong.",
+            description: errorMessage,
+            duration: 1500
+          });
+        }
+      } catch (error) {
+        toast({
+          variant: "destructive",
+          title: "Uh oh! Something went wrong.",
+          description: "" + error as string,
+          duration: 3000
+        })
+      }
+    }
+    return chatId;
+  };
+
+  const handleFileDelete = async (docIdList: string[]) => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/document/delete_file`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${back_auth}`
+        },
+        body: JSON.stringify(
+          docIdList
+        )
+      });
+      if (!response.ok) {
+        const resJson = await response.json();
+        throw new Error(resJson.detail);
+      }
+      toast({
+        description: "Selected files deleted successfully.",
+        duration: 1500
+      });
+      setDocuments(documents.filter((doc) => !docIdList.includes(doc.document_id)));
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Uh oh! Something went wrong.",
+        description: "Failed to delete. " + error as string,
         duration: 1500
       });
       // console.error('Error:', error);
@@ -233,6 +327,8 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
             response.status === 401 ? getuId_token() : response.json())
           .then((data) => {
             const rawMessages = data?.conversation?.main?.messages || [];
+            const tokensConsumed = data?.tokensConsumed || 0;
+            setDocuments(data?.files || []);
             if (rawMessages.length > 0) {
               const newMessages: Message[] = rawMessages
                 .filter((message: any) => {
@@ -431,8 +527,15 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           <div className='flex-1 overflow-auto'>
             <Sidebar />
             <div className="flex h-dvh flex-col">
-              <HeaderMobile service={chatService} onNewChatClick={() => handleNewChat()} getuId_token={getuId_token} back_auth={back_auth} />
-              <HeaderDesktop service={chatService} getuId_token={getuId_token} back_auth={back_auth} />
+              <div className="flex flex-row place-content-between border-b">
+                <Header service={chatService} onNewChatClick={() => handleNewChat()} getuId_token={getuId_token} back_auth={back_auth} />
+                {documents.length > 0 && (
+                  <DocumentManager
+                    documents={documents}
+                    onDelete={handleFileDelete} // Pass the handleFileDelete function
+                  />
+                )}
+              </div>
               <div className='flex h-full overflow-y-auto'>
                 <div
                   ref={chatContainerRef}

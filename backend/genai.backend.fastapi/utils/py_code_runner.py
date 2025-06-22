@@ -1,5 +1,4 @@
-from typing import Optional
-from typing_extensions import Annotated
+from typing import Optional, Annotated
 from langgraph.prebuilt import InjectedState
 import sys, io, traceback, contextlib, datetime
 from pydantic import BaseModel, Field

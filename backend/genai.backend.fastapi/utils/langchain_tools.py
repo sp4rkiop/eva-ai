@@ -1,10 +1,13 @@
 from langchain.tools import Tool, StructuredTool
 from typing import List
+from services.document_service import DocumentRetrieverTool, DocumentService
 from .py_code_runner import current_utc_date_time, python_code_runner, PythonCodeRunnerInput, CurrentUtcDateTimeInput
 from .web_search import WebSearchService, ScrapUrlListInput, SearchInput
 
+
 def get_tools() -> List[Tool | StructuredTool]:
     web = WebSearchService()
+    doc = DocumentService()
     return [
         StructuredTool.from_function(
             func=web.scrap_url_list,
@@ -19,6 +22,13 @@ def get_tools() -> List[Tool | StructuredTool]:
             name=web.search.__getattribute__("__name__"),
             description=web.search.__getattribute__("__doc__"),
             args_schema=SearchInput,
+        ),
+        StructuredTool.from_function(
+            func=doc.get_relevant_docs,
+            coroutine=doc.get_relevant_docs,
+            name=doc.get_relevant_docs.__getattribute__("__name__"),
+            description="Use to get relevant content from Files when you don't know the question. " + doc.get_relevant_docs.__getattribute__("__doc__"),
+            args_schema=DocumentRetrieverTool,
         ),
         StructuredTool.from_function(
             func=python_code_runner,

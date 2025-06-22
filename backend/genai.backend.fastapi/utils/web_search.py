@@ -155,7 +155,7 @@ class WebSearchService:
                     if result.status_code == 200:
                         user_query = ""
                         if state: 
-                            user_query = query if query else state["user_query"]
+                            user_query = query if query else state["user_input"]
                             await ws_manager.send_to_user(
                                 sid=state["user_id"],
                                 message_type="ToolProcess",
@@ -169,6 +169,7 @@ class WebSearchService:
                         scrap_result[result.url] = chunks
                     else:
                         logger.error(f"Failed to scrap {result.url}. Status code: {result.status_code}")
+                        return {"error": [f"Failed to scrap {result.url}. Status code: {result.status_code}. Try again later."]}
 
                 if state:
                     await ws_manager.send_to_user(
@@ -179,6 +180,7 @@ class WebSearchService:
                 return scrap_result 
         except Exception as e:
             logger.exception(f"Failed to scrap {url_list}: {e}")
+            return {"error": [f"Failed to scrap {url_list}. Try again later."]}
 
     def markdown_html_content(self, html_content, page_url):
         """

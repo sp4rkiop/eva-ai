@@ -11,6 +11,8 @@ pydantic-settings
 pydantic[email]
 python-jose
 asyncpg
+pgvector
+pdfminer
 sqlalchemy[asyncio]
 uvicorn[standard]
 websockets

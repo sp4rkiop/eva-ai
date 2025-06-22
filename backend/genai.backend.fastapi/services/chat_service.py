@@ -7,8 +7,10 @@ from typing import TypedDict, Dict, Any, List, Optional, Sequence
 from models.ai_models_model import AiModels
 from models.chat_history_model import ChatHistory
 from models.response_model import ChatResponse
+from models.user_document_model import UserDocument
 from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
+from services.document_service import DocumentService
 from services.management_service import ManagementService
 from langchain_openai import AzureChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -32,6 +34,7 @@ class ChatService:
         self.history_limit = 4
         self.branch = "main"
         self.user_service = UserService()
+        self.doc_service = DocumentService()
         self.workflow = self.create_workflow()
 
     def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:
@@ -88,12 +91,12 @@ class ChatService:
             # Create prompt based on state
             if state["tool_used"]:
                 prompt = ChatPromptTemplate.from_messages([
-                    ("system", settings.SYSTEM_PROMPT),
+                    ("system", state['sys_prompt']),
                     *history
                 ])
             else:
                 prompt = ChatPromptTemplate.from_messages([
-                    ("system", settings.SYSTEM_PROMPT),
+                    ("system", state['sys_prompt']),
                     *history,
                     HumanMessage(content=state['user_input'])
                 ])
@@ -109,7 +112,7 @@ class ChatService:
                     message_type="StreamMessage",
                     data={"chat_id": state['chat_id'], "content": chunk.content}
                 )
-                await asyncio.sleep(0.015) # 15ms delay to simulate real-time response
+                await asyncio.sleep(0.015) # 15ms delay to simulate smooth typing
 
                 if ai_message is None:
                     ai_message = chunk
@@ -153,6 +156,10 @@ class ChatService:
                     state['chat_id'] = str(new_chat.chat_id)
                     await session.commit()
             else:
+                if state["chat_title"].strip() == "":
+                    title_result = await self.generate_chat_title(state['user_input'])
+                    state['token_usage'] += title_result['token_uses']
+                    state['chat_title'] = title_result['content']
                 # Save to database
                 async with PostgreSQLDatabase.get_session() as session:
                     update_chat = (
@@ -163,6 +170,7 @@ class ChatService:
                             )
                         .values(
                             history_blob=pickle.dumps(self.store),
+                            chat_title=state['chat_title'],
                             token_count=state['token_usage']
                         )
                     )
@@ -272,7 +280,9 @@ class ChatService:
                 "user_id": user_id,
                 "user_input": user_input,
                 "chat_id": str(chat_id) if chat_id else None,
+                "chat_title": "",
                 "new_chat": not chat_id,
+                "sys_prompt": settings.SYSTEM_PROMPT,
                 "token_usage": 0,
                 "tool_used": False
             }
@@ -280,8 +290,14 @@ class ChatService:
             # Load existing chat history if available
             if chat_id:
                 chat_history_data = await self.user_service.get_single_conversation(user_id, chat_id)
+                
+                doc_data = chat_history_data['files']
                 self.store = chat_history_data['conversation']
+                state['chat_title'] = chat_history_data['title']
                 state['token_usage'] = chat_history_data['token_consumed']
+
+                if doc_data and len(doc_data) > 0:
+                    state['sys_prompt'] += "\n\n Accessible Files in the chat: " + ", ".join([file['file_name'] for file in doc_data])
             else:
                 state['chat_id'] = str(user_id)  # Temporary ID for streaming
             
@@ -297,7 +313,7 @@ class ChatService:
                 str(chat_id) if chat_id else str(user_id),
                 f"Processing error: {str(e)}"
             )
-            return None
+            raise Exception(e)
 
     async def generate_chat_title(self, user_input: str) -> Dict[str, Any]:
         """
@@ -384,7 +400,9 @@ class GraphState(TypedDict):
     user_id: uuid.UUID
     user_input: str
     chat_id: Optional[str]
+    chat_title: str
     new_chat: bool
     messages: List[BaseMessage]
+    sys_prompt: str
     token_usage: int
     tool_used: bool

@@ -39,6 +39,8 @@ class PostgreSQLDatabase:
             async with engine.begin() as conn:
                 # Enable pgcrypto for UUID generation
                 await conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"))
+                # Enable vector extension
+                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "vector";'))
                 # Create all tables defined in the ORM models
                 await conn.run_sync(Base.metadata.create_all)
             logger.info("Database connection initialized successfully.")

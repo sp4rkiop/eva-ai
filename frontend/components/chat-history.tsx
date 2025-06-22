@@ -536,7 +536,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                     <AvatarFallback className="rounded-full">{firstName[0]}{lastName[0]}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{firstName} {lastName}</span>
+                    <span className="truncate font-medium capitalize">{firstName} {lastName}</span>
                     <span className="text-muted-foreground truncate text-xs">
                       {uMail}
                     </span>
@@ -553,7 +553,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                     <AvatarFallback className="rounded-full">CN</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{firstName} {lastName}</span>
+                    <span className="truncate font-medium capitalize">{firstName} {lastName}</span>
                     <span className="text-muted-foreground truncate text-xs">
                       {uMail}
                     </span>
@@ -566,7 +566,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                 onClick={() => { router.push('/admin') }}
               >
                 <UserRoundCog /> Admin Dashboard
-                <DropdownMenuShortcut>⇧⌘A</DropdownMenuShortcut>
+                {/* <DropdownMenuShortcut>⇧⌘A</DropdownMenuShortcut> */}
               </DropdownMenuItem>
               {/* <DropdownMenuItem>Billing</DropdownMenuItem> */}
               {/* <DropdownMenuItem>
@@ -574,7 +574,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
               </DropdownMenuItem> */}
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut /> Log out
-                <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+                {/* <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut> */}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from models.chat_history_model import ChatHistory
     from models.subscriptions_model import Subscriptions
+    from models.user_document_model import UserDocument
 
 class Users(Base):
     __tablename__ = "users"
@@ -26,5 +27,8 @@ class Users(Base):
         back_populates="users", cascade="all, delete-orphan"
     )
     subscriptions: Mapped[list["Subscriptions"]] = relationship(
+        back_populates="users", cascade="all, delete-orphan"
+    )
+    documents: Mapped[list["UserDocument"]] = relationship(
         back_populates="users", cascade="all, delete-orphan"
     )

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     REDIS_PASSWORD: str = "dev_password"
     OPENROUTER_URI: str = "https://openrouter.ai/api/v1"
     OPENROUTER_TOKEN: str = "YOUR_OPENROUTER_TOKEN"
+    AZURE_OPENAI_ENDPOINT: str = "YOUR_AZURE_OPENAI_API_BASE"
+    AZURE_OPENAI_API_KEY: str = "YOUR_AZURE_OPENAI_API_KEY"
     AZURE_OPENAI_API_VERSION: str = "2024-10-21"
 
     class Config:
