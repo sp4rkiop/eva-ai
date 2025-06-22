@@ -24,8 +24,6 @@ class DocumentChunk(Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
             postgresql_with={"m": 16, "ef_construction": 64},  # tuned for medium corpora
         ),
-        # Extra B‑tree index (already added via `index=True` but named explicitly here)
-        Index("ix_document_chunks_document_id", "document_id"),
     )
 
     chunk_id: Mapped[uuid.UUID] = mapped_column(
