@@ -84,6 +84,7 @@ class DocumentService:
         self, *, user_id: uuid.UUID, file: UploadFile, chat_id: Optional[uuid.UUID] = None
     ) -> ChatResponse:
         path = ""
+        new_chat_id = None
         try:
             #-----------------------------------------------------------------
             if chat_id is None:
@@ -96,7 +97,7 @@ class DocumentService:
                     )
                     session.add(new_chat)
                     await session.flush()
-                    chat_id = new_chat.chat_id
+                    new_chat_id = new_chat.chat_id
                     await session.commit()
 
             #-----------------------------------------------------------------
@@ -104,25 +105,30 @@ class DocumentService:
             self.embedding_model = await self.get_llm_from_model()
             async with PostgreSQLDatabase.get_session() as session:
                 doc = UserDocument(
-                    user_id=user_id, chat_id=chat_id, file_name=file.filename, file_path=path
+                    user_id=user_id, 
+                    chat_id=chat_id or new_chat_id, 
+                    file_name=file.filename, 
+                    file_path=path
                 )
                 session.add(doc)
                 await session.flush()  # we need doc.document_id
                 await ws_manager.send_to_user(
                     sid=user_id,
                     message_type="ToolProcess",
-                    data={"chat_id": str(chat_id), "content": f"Processing {file.filename}..."}
+                    data={"chat_id": str(chat_id if chat_id else user_id), "content": f"Processing {file.filename}..."}
                 )
                 await self._embed_and_persist_chunks(path, doc.document_id, session)
                 await ws_manager.send_to_user(
                     sid=user_id,
                     message_type="ToolProcess",
-                    data={"chat_id": str(chat_id), "content": f"Finished processing {file.filename}."}
+                    data={"chat_id": str(chat_id if chat_id else user_id), "content": f"Finished processing {file.filename}."}
                 )
                 await session.commit()
-            return ChatResponse(success=True, chat_id=chat_id)
+            return ChatResponse(success=True, chat_id=chat_id or new_chat_id)
         except ValueError as e:
-            return ChatResponse(success=False, error_message= "Error storing file: " + str(e))
+            return ChatResponse(success=False, chat_id=chat_id or new_chat_id, error_message=str(e))
+        except Exception as e:
+            return ChatResponse(success=False, chat_id=chat_id or new_chat_id, error_message=str(e))
         finally:
             # Finally delete the uploaded file
             if path not in ["", None] and os.path.exists(path):

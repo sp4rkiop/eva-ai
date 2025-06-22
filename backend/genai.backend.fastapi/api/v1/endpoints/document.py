@@ -25,7 +25,7 @@ async def get_all_files(
     try:
         return await document_service.get_all_files_for_user(uuid.UUID(payload["user_id"]))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get files: {str(e)}")
+        raise
 
 @router.get("/files_in_chat")
 async def get_files_in_chat(

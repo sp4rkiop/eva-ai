@@ -199,16 +199,10 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         });
 
         if (!response.ok) {
-          throw new Error(`Error uploading file: ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to upload: ${response.status} ${response.statusText}`);
         }
         const responseJson = await response.json();
         if (responseJson.success) {
-          const newChatId = responseJson.chat_id;
-          if (currentChatId === undefined && newChatId != null && newChatId.length != 0) {
-            chatId = newChatId;
-            setCurrentChatId(newChatId);
-            window.history.pushState({}, '', `/c/${newChatId}`);
-          }
           toast({
             variant: "default",
             title: `${file.name} uploaded successfully.`,
@@ -222,6 +216,12 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
             description: errorMessage,
             duration: 1500
           });
+        }
+        const newChatId = responseJson.chat_id;
+        if (currentChatId === undefined && newChatId != null && newChatId.length != 0) {
+          chatId = newChatId;
+          setCurrentChatId(newChatId);
+          window.history.pushState({}, '', `/c/${newChatId}`);
         }
       } catch (error) {
         toast({
