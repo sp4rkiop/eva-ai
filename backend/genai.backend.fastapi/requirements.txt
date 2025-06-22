@@ -21,3 +21,4 @@ redis
 aiofiles
 pypdf
 python-multipart
+unstructured
