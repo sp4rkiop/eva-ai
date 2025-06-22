@@ -17,7 +17,6 @@ from models.chat_history_model import ChatHistory
 from models.ai_models_model import AiModels
 from models.subscriptions_model import Subscriptions
 from models.user_document_model import UserDocument
-from services.document_service import DocumentService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 class UserService:
     def __init__(self):
-        self.doc_service = DocumentService()
         self.redis = RedisCache.get_connection()
         self.USER_SESSIONS_PREFIX = "user_sessions:"
         self.SESSION_EXPIRY = timedelta(days=1)

@@ -8,6 +8,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import PostgreSQLDatabase
 from core.redis_cache import RedisCache
+from core.config import settings
+from models.ai_models_model import AiModels
 from models.response_model import ChatResponse
 from models.chat_history_model import ChatHistory
 from models.user_document_model import UserDocument
@@ -34,6 +36,8 @@ from langchain_community.document_loaders import (
     TextLoader,                          # .txt / any plain‑text
 )
 
+from services.management_service import ManagementService
+
 MAX_BYTES = 30 * 1024 * 1024   # 30 MB
 
 class DocumentRetrieverTool(BaseModel):
@@ -44,15 +48,26 @@ class DocumentRetrieverTool(BaseModel):
 
 class DocumentService:
     def __init__(self) -> None:
-        self.embedding_model = AzureOpenAIEmbeddings(
-            azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-            api_key=SecretStr(os.environ["AZURE_OPENAI_API_KEY"]),
-            azure_deployment="text-embedding-3-small",
-            model = "text-embedding-3-small",
-            api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-        )
+        self.embedding_model: AzureOpenAIEmbeddings
 
-    async def get_embedding(self, text: str) -> List[float]:
+    async def get_llm_from_model(self) -> AzureOpenAIEmbeddings:
+        """
+        Initializes and returns an AzureOpenAIEmbeddings instance using the model's details.
+        """
+        available_models: List[AiModels] = await ManagementService.get_all_models()
+        embed_model = next((m for m in available_models if m.model_type == "embedding" and m.is_active), None)
+        if embed_model is None:
+            raise Exception("Embedding model is not available atm")
+        return AzureOpenAIEmbeddings(
+            dimensions=1536,
+            azure_endpoint=embed_model.endpoint,
+            api_key=SecretStr(embed_model.api_key),
+            azure_deployment=embed_model.deployment_name,
+            model = embed_model.deployment_name,
+            api_version=settings.AZURE_OPENAI_API_VERSION,
+        )
+    
+    async def get_embedding_for_text(self, text: str) -> List[float]:
         """
         Generate embedding for the given text.
 
@@ -86,6 +101,7 @@ class DocumentService:
 
             #-----------------------------------------------------------------
             path = await self._save_file_locally(file)
+            self.embedding_model = await self.get_llm_from_model()
             async with PostgreSQLDatabase.get_session() as session:
                 doc = UserDocument(
                     user_id=user_id, chat_id=chat_id, file_name=file.filename, file_path=path
@@ -184,8 +200,9 @@ class DocumentService:
             message_type="ToolProcess",
             data={"chat_id": state["chat_id"], "content": "Retrieving relevant sections..."}
         )
+        self.embedding_model = await self.get_llm_from_model()
         # Step 1: Generate query embedding
-        query_embedding = await self.get_embedding(query)
+        query_embedding = await self.get_embedding_for_text(query)
 
         async with PostgreSQLDatabase.get_session() as session:
             if search_pattern == "simple_keyword_search":
