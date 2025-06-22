@@ -19,3 +19,5 @@ websockets
 apscheduler
 redis
 aiofiles
+pypdf
+python-multipart
