@@ -17,3 +17,4 @@ sqlalchemy[asyncio]
 uvicorn[standard]
 websockets
 apscheduler
+redis
