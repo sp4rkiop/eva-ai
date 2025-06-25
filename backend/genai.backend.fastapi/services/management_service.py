@@ -1,5 +1,4 @@
-import json
-import logging, uuid
+import logging, uuid, pickle
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
@@ -33,7 +32,7 @@ class ManagementService:
         try:
             model_list = await redis.get("all_models")
             if model_list is not None:
-                return json.loads(model_list)
+                return pickle.loads(model_list)
             async with PostgreSQLDatabase.get_session() as session:
                 # Query AI models
                 stmt = select(AiModels)
@@ -42,11 +41,11 @@ class ManagementService:
                 
                 model_list = list(ai_models)
                 #save into cache
-                await redis.set("all_models", json.dumps(model_list), 86400) # 86400 seconds = 1 day
+                await redis.set("all_models", pickle.dumps(model_list), 86400) # 86400 seconds = 1 day
                 return list(model_list)
         except Exception as ex:
             # Log the exception
-            logger.error(f"Failed to get models: {str(ex)}")
+            logger.error(f"Failed to get models: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to get models: {str(ex)}")
         
     async def get_users_details_paginated(
