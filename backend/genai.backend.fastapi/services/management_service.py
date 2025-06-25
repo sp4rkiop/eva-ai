@@ -359,6 +359,8 @@ class ManagementService:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
             await session.delete(user)
             await session.commit()
+            user_service = UserService()
+            await user_service.delete_all_user_sessions(user_id) # Delete all sessions for the user
 
     async def modify_model(self, model_id: uuid.UUID, query_params: Dict[str, Any]):
         async with PostgreSQLDatabase.get_session() as session:

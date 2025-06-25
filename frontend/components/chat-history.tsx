@@ -390,7 +390,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                   onClick={toggleSearch}
                   aria-label="Close search"
                 >
-                  <IconClose className="size-6" />
+                  <IconClose className="size-5" />
                 </button>
               </div>
             ) : (
@@ -417,7 +417,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                   onClick={toggleSearch}
                   aria-label="Search chats"
                 >
-                  < Search className='size-6' />
+                  < Search className='size-5' />
                 </button>
               </div>
             )}

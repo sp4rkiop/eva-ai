@@ -266,7 +266,7 @@ class DocumentService:
                     if bytes_written > MAX_BYTES:
                         raise HTTPException(
                             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            detail="File exceeds 100 MB limit.",
+                            detail=f"File exceeds {MAX_BYTES / 1024 / 1024} MB limit.",
                         )
                     await f.write(chunk)
             if bytes_written == 0:

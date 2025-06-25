@@ -16,7 +16,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+    const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB in bytes
     const MAX_FILES = 5;
 
     useEffect(() => {
@@ -101,7 +101,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
 
             // Check file size
             if (file.size > MAX_FILE_SIZE) {
-                invalidFiles.push(`${file.name} (exceeds 50MB)`);
+                invalidFiles.push(`${file.name} (exceeds ${MAX_FILE_SIZE / (1024 * 1024)}MB)`);
                 return;
             }
 
@@ -196,15 +196,19 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
                                     </p>
                                 </div>
                             </div>
-                            <Loader2 className="ml-2 animate-spin hidden" />
-                            <button
-                                type="button"
-                                onClick={() => handleRemoveFile(index)}
-                                className="flex-shrink-0 ml-1 p-1 rounded-sm hover-light-dark"
-                                aria-label="Remove file"
-                            >
-                                <X className="h-3 w-3 text-neutral-500 dark:text-neutral-200" />
-                            </button>
+                            {isActive ?
+                                <Loader2 className="ml-1 size-4 text-neutral-500 dark:text-neutral-200 animate-spin" />
+                                :
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveFile(index)}
+                                    className="flex-shrink-0 ml-1 p-1 rounded-sm hover-light-dark"
+                                    aria-label="Remove file"
+                                >
+                                    <X className="size-4 text-neutral-500 dark:text-neutral-200" />
+                                </button>
+                            }
+
                         </div>
                     ))}
                 </div>
@@ -248,7 +252,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
                                 onBlur={() => setIsTyping(text.trim().length > 0)}
                                 onKeyDown={handleKeyDown}
                                 disabled={isActive}
-                                className={`w-full resize-none outline-none bg-transparent dark:bg-transparent placeholder-black/60 dark:placeholder-white/60 text-base ${isActive && 'opacity-50 cursor-wait'}`}
+                                className={`w-full resize-none outline-none py-2 bg-transparent dark:bg-transparent placeholder-black/60 dark:placeholder-white/60 text-base ${isActive && 'opacity-50 cursor-wait'}`}
                                 style={{ maxHeight: '240px', overflowY: 'auto' }}
                             />
                         </div>

@@ -1,4 +1,4 @@
-import uuid, pickle, logging, re, asyncio
+import uuid, pickle, logging, re, asyncio, openai
 from pydantic import SecretStr
 from sqlalchemy import update
 from core.database import PostgreSQLDatabase
@@ -12,7 +12,7 @@ from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
 from services.document_service import DocumentService
 from services.management_service import ManagementService
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI, OpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -247,6 +247,33 @@ class ChatService:
                 self.llm = self.get_llm_from_model(selected_model)
                 new_chat_id = await self.lanchain_chat(user_id, user_input, chat_id)
                 return ChatResponse(success=True, chat_id=new_chat_id)
+            
+        except openai.BadRequestError as e:
+            error_code = ""
+
+            if hasattr(e, "response"):
+                if callable(getattr(e.response, "json", None)):
+                    error_json = e.response.json()
+                    error_code = error_json.get("error", {}).get("code", "")
+                elif isinstance(e.response, dict):
+                    # OpenAI native
+                    error_code = e.response.get("error", {}).get("code", "")
+
+            if error_code == "content_filter":
+                await self.send_failed_socket_message(
+                    user_id,
+                    str(chat_id if chat_id else user_id),
+                    "Your message contains sensitive content and has been blocked by the OpenAI content filter."
+                )
+                return ChatResponse(success=False, error_message="Your message contains sensitive content and has been blocked by the OpenAI content filter.")
+            else:
+                await self.send_failed_socket_message(
+                    user_id,
+                    str(chat_id if chat_id else user_id),
+                    f"Something went wrong, please wait for a while. Error: {str(e)}"
+                )
+                return ChatResponse(success=False, error_message="Server handling error: " + str(e))
+            
         except Exception as e:
             await self.send_failed_socket_message(
                 user_id, 
@@ -308,11 +335,6 @@ class ChatService:
             
         except Exception as e:
             logger.exception(f"Error processing chat: {e}", exc_info=True)
-            await self.send_failed_socket_message(
-                user_id,
-                str(chat_id) if chat_id else str(user_id),
-                f"Processing error: {str(e)}"
-            )
             raise Exception(e)
 
     async def generate_chat_title(self, user_input: str) -> Dict[str, Any]:
