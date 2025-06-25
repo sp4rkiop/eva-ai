@@ -270,7 +270,7 @@ class ChatService:
                 await self.send_failed_socket_message(
                     user_id,
                     str(chat_id if chat_id else user_id),
-                    f"Something went wrong, please wait for a while. Error: {str(e)}"
+                    f"OpenAI API request failed. Error: {str(e)}"
                 )
                 return ChatResponse(success=False, error_message="Server handling error: " + str(e))
             
@@ -335,7 +335,7 @@ class ChatService:
             
         except Exception as e:
             logger.exception(f"Error processing chat: {e}", exc_info=True)
-            raise Exception(e)
+            raise
 
     async def generate_chat_title(self, user_input: str) -> Dict[str, Any]:
         """
