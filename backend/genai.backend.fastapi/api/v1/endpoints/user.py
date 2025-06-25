@@ -26,8 +26,7 @@ async def login_signup(
         response.headers["X-Auth-Token"] = f"{result["token"]}"
         return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail="Internal server error")
 # @router.get("/me")
 # async def who_am_i(payload: dict = Depends(get_current_user)):
 #     return payload
@@ -40,8 +39,7 @@ async def get_all_models(
         result = await user_service.get_subscribed_models(uuid.UUID(payload["user_id"]))
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail="Internal server error")
 @router.get("/conversations")
 async def get_all_conversations(
     payload: dict = Depends(get_current_user), 
@@ -50,8 +48,7 @@ async def get_all_conversations(
         result = await user_service.get_conversations(uuid.UUID(payload["user_id"]))
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        raise HTTPException(status_code=500, detail="Internal server error")    
 @router.get("/conversations/{chat_id}")
 async def get_single_conversation(
     chat_id: str = Path(...), 
@@ -63,8 +60,7 @@ async def get_single_conversation(
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail="Internal server error")
     
 @router.patch("/conversations/{chat_id}")
 async def rename_or_delete_conversation(

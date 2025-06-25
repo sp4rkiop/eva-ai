@@ -3,7 +3,7 @@ from fastapi import HTTPException
 import uuid, logging, pickle, secrets
 from jose import jwt
 from pydantic import EmailStr
-from sqlalchemy import update
+from sqlalchemy import delete, update
 from core.redis_cache import RedisCache
 from core.database import PostgreSQLDatabase
 from core.config import settings
@@ -449,6 +449,13 @@ class UserService:
                     .values(visible=False)
                 )
                 result = await session.execute(update_stmt)
+
+                # Delete any associated files
+                delete_stmt = (
+                    delete(UserDocument)
+                    .where(UserDocument.chat_id == chat_id)
+                )
+                await session.execute(delete_stmt)
 
                 # Return True if exactly 1 row was affected
                 return result.rowcount == 1

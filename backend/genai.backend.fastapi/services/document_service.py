@@ -146,6 +146,12 @@ class DocumentService:
             stmt = select(UserDocument).where(UserDocument.user_id == user_id, UserDocument.chat_id == chat_id)
             results = await session.execute(stmt)
             return list(results.scalars().unique().all())
+    
+    async def del_files_for_chat(self, user_id: uuid.UUID, chat_id: uuid.UUID):
+        async with PostgreSQLDatabase.get_session() as session:
+            stmt = delete(UserDocument).where(UserDocument.user_id == user_id, UserDocument.chat_id == chat_id)
+            await session.execute(stmt)
+            await session.commit()
         
     async def delete_file(self, user_id: uuid.UUID, document_id: List[uuid.UUID]):
         async with PostgreSQLDatabase.get_session() as session:

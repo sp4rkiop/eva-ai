@@ -10,7 +10,6 @@ from models.response_model import ChatResponse
 from models.user_document_model import UserDocument
 from repositories.websocket_manager import ws_manager
 from services.user_service import UserService
-from services.document_service import DocumentService
 from services.management_service import ManagementService
 from langchain_openai import AzureChatOpenAI, OpenAI
 from langchain_core.prompts import ChatPromptTemplate
@@ -34,7 +33,6 @@ class ChatService:
         self.history_limit = 4
         self.branch = "main"
         self.user_service = UserService()
-        self.doc_service = DocumentService()
         self.workflow = self.create_workflow()
 
     def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:

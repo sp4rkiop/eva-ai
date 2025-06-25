@@ -1,13 +1,14 @@
+import json
 import logging, uuid
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select, cast, Date
 from core.database import PostgreSQLDatabase
+from core.redis_cache import RedisCache
 from models.request_model import AiModel
 from services.user_service import UserService
 from utils.cursor_utils import encode_cursor, decode_cursor
-from repositories.cache_repository import CacheRepository
 from models.ai_models_model import AiModels
 from models.subscriptions_model import Subscriptions
 from models.users_model import Users
@@ -28,10 +29,11 @@ class ManagementService:
         Returns:
             List of models or empty list
         """
+        redis = RedisCache.get_connection()
         try:
-            model_list = CacheRepository.get("all_models")
+            model_list = await redis.get("all_models")
             if model_list is not None:
-                return model_list
+                return json.loads(model_list)
             async with PostgreSQLDatabase.get_session() as session:
                 # Query AI models
                 stmt = select(AiModels)
@@ -40,7 +42,7 @@ class ManagementService:
                 
                 model_list = list(ai_models)
                 #save into cache
-                CacheRepository.set("all_models", model_list, 86400) # 86400 seconds = 1 day
+                await redis.set("all_models", json.dumps(model_list), 86400) # 86400 seconds = 1 day
                 return list(model_list)
         except Exception as ex:
             # Log the exception
