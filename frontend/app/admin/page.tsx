@@ -806,7 +806,7 @@ export default function AdminDashboard() {
       {/* Sidebar - Responsive */}
       <div className={`fixed md:relative inset-y-0 left-0 z-40 w-64 sidebar-color p-6 flex flex-col transform transition-transform duration-300 ease-in-out md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         }`}>
-        <div className="mb-10 flex flex-row items-center">
+        <div className="mb-10 flex flex-row items-center cursor-pointer" onClick={() => router.push('/')}>
           <Avatar className="mr-2 size-8 rounded-full">
             <AvatarImage src="/icon.svg" alt="Eva" />
             <AvatarFallback className="rounded-full">Eva</AvatarFallback>

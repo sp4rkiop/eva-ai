@@ -3,9 +3,9 @@ import { IconEva } from './ui/icons';
 
 const Greet: React.FC = () => {
     return (
-        <div className="flex flex-row items-center">
+        <div className="flex flex-row items-center -ml-4">
             <div className="relative">
-                <div className="h-10 w-10 md:h-12 md:w-12">
+                <div className="size-10 md:size-12">
                     <img src="/icon.svg" alt="Eva" />
                 </div>
             </div>

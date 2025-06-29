@@ -190,7 +190,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         const formData = new FormData();
         formData.append('file', file);
 
-        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/document/upload${chatId ? `?chat_id=${chatId}` : '' }`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/document/upload${chatId ? `?chat_id=${chatId}` : ''}`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${back_auth}`,
