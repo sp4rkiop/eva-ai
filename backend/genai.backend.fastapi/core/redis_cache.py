@@ -7,6 +7,7 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class RedisCache:
     _connection: redis.Redis
 
@@ -21,7 +22,7 @@ class RedisCache:
                 socket_timeout=5,
                 socket_connect_timeout=5,
                 health_check_interval=30,
-                retry_on_timeout=True
+                retry_on_timeout=True,
             )
             # Test connection
             await cls._connection.ping()
@@ -33,7 +34,9 @@ class RedisCache:
     @classmethod
     def get_connection(cls) -> redis.Redis:
         if cls._connection is None:
-            raise RuntimeError("Redis connection is not initialized. Call `initialize()` first.")
+            raise RuntimeError(
+                "Redis connection is not initialized. Call `initialize()` first."
+            )
         return cls._connection
 
     @classmethod

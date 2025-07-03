@@ -18,33 +18,35 @@ from langgraph.prebuilt import InjectedState
 from langchain_openai import AzureOpenAIEmbeddings
 from repositories.websocket_manager import ws_manager
 from langchain_core.documents import Document
-from pypdf import PdfReader 
+from pypdf import PdfReader
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
-    Language,               # for code‑aware splitting
-    MarkdownTextSplitter,   # optional markdown logic
+    Language,  # for code‑aware splitting
+    MarkdownTextSplitter,  # optional markdown logic
 )
 from langchain_community.document_loaders import (
     PyPDFLoader,
-    UnstructuredPDFLoader,               # .pdf with OCR
-    UnstructuredWordDocumentLoader,      # .docx
-    UnstructuredPowerPointLoader,        # .pptx
-    UnstructuredExcelLoader,             # .xlsx
-    UnstructuredEmailLoader,             # .eml / .msg
-    UnstructuredHTMLLoader,              # .html / .htm
-    CSVLoader,                           # .csv
-    TextLoader,                          # .txt / any plain‑text
+    UnstructuredPDFLoader,  # .pdf with OCR
+    UnstructuredWordDocumentLoader,  # .docx
+    UnstructuredPowerPointLoader,  # .pptx
+    UnstructuredExcelLoader,  # .xlsx
+    UnstructuredEmailLoader,  # .eml / .msg
+    UnstructuredHTMLLoader,  # .html / .htm
+    CSVLoader,  # .csv
+    TextLoader,  # .txt / any plain‑text
 )
 
 from services.management_service import ManagementService
 
-MAX_BYTES = 30 * 1024 * 1024   # 30 MB
+MAX_BYTES = 30 * 1024 * 1024  # 30 MB
+
 
 class DocumentRetrieverTool(BaseModel):
     query: str
     top_k: int
     search_pattern: str
     state: Annotated[dict, InjectedState]
+
 
 class DocumentService:
     def __init__(self) -> None:
@@ -55,7 +57,14 @@ class DocumentService:
         Initializes and returns an AzureOpenAIEmbeddings instance using the model's details.
         """
         available_models: List[AiModels] = await ManagementService.get_all_models()
-        embed_model = next((m for m in available_models if m.model_type == "embedding" and m.is_active), None)
+        embed_model = next(
+            (
+                m
+                for m in available_models
+                if m.model_type == "embedding" and m.is_active
+            ),
+            None,
+        )
         if embed_model is None:
             raise Exception("Embedding model is not available atm")
         return AzureOpenAIEmbeddings(
@@ -63,10 +72,10 @@ class DocumentService:
             azure_endpoint=embed_model.endpoint,
             api_key=SecretStr(embed_model.api_key),
             azure_deployment=embed_model.deployment_name,
-            model = embed_model.deployment_name,
+            model=embed_model.deployment_name,
             api_version=settings.AZURE_OPENAI_API_VERSION,
         )
-    
+
     async def get_embedding_for_text(self, text: str) -> List[float]:
         """
         Generate embedding for the given text.
@@ -79,80 +88,100 @@ class DocumentService:
         """
         text = text.replace("\n", " ")
         return await self.embedding_model.aembed_query(text)
-    
+
     async def store_file(
-        self, *, user_id: uuid.UUID, file: UploadFile, chat_id: Optional[uuid.UUID] = None
+        self,
+        *,
+        user_id: uuid.UUID,
+        file: UploadFile,
+        chat_id: Optional[uuid.UUID] = None,
     ) -> ChatResponse:
         path = ""
         new_chat_id = None
         try:
-            #-----------------------------------------------------------------
+            # -----------------------------------------------------------------
             if chat_id is None:
                 async with PostgreSQLDatabase.get_session() as session:
                     new_chat = ChatHistory(
                         user_id=user_id,
                         history_blob=pickle.dumps({}),
                         chat_title="",
-                        token_count=0
+                        token_count=0,
                     )
                     session.add(new_chat)
                     await session.flush()
                     new_chat_id = new_chat.chat_id
                     await session.commit()
 
-            #-----------------------------------------------------------------
+            # -----------------------------------------------------------------
             path = await self._save_file_locally(file)
             self.embedding_model = await self.get_llm_from_model()
             async with PostgreSQLDatabase.get_session() as session:
                 doc = UserDocument(
-                    user_id=user_id, 
-                    chat_id=chat_id or new_chat_id, 
-                    file_name=file.filename, 
-                    file_path=path
+                    user_id=user_id,
+                    chat_id=chat_id or new_chat_id,
+                    file_name=file.filename,
+                    file_path=path,
                 )
                 session.add(doc)
                 await session.flush()  # we need doc.document_id
                 await ws_manager.send_to_user(
                     sid=user_id,
                     message_type="ToolProcess",
-                    data={"chat_id": str(chat_id if chat_id else user_id), "content": f"Processing {file.filename}..."}
+                    data={
+                        "chat_id": str(chat_id if chat_id else user_id),
+                        "content": f"Processing {file.filename}...",
+                    },
                 )
                 await self._embed_and_persist_chunks(path, doc.document_id, session)
                 await ws_manager.send_to_user(
                     sid=user_id,
                     message_type="ToolProcess",
-                    data={"chat_id": str(chat_id if chat_id else user_id), "content": f"Finished processing {file.filename}."}
+                    data={
+                        "chat_id": str(chat_id if chat_id else user_id),
+                        "content": f"Finished processing {file.filename}.",
+                    },
                 )
                 await session.commit()
             return ChatResponse(success=True, chat_id=chat_id or new_chat_id)
         except ValueError as e:
-            return ChatResponse(success=False, chat_id=chat_id or new_chat_id, error_message=str(e))
+            return ChatResponse(
+                success=False, chat_id=chat_id or new_chat_id, error_message=str(e)
+            )
         except Exception as e:
-            return ChatResponse(success=False, chat_id=chat_id or new_chat_id, error_message=str(e))
+            return ChatResponse(
+                success=False, chat_id=chat_id or new_chat_id, error_message=str(e)
+            )
         finally:
             # Finally delete the uploaded file
             if path not in ["", None] and os.path.exists(path):
                 os.remove(path)
                 shutil.rmtree(os.path.dirname(path))
-        
+
     async def get_all_files_for_user(self, user_id: uuid.UUID) -> List[UserDocument]:
         async with PostgreSQLDatabase.get_session() as session:
             stmt = select(UserDocument).where(UserDocument.user_id == user_id)
             results = await session.execute(stmt)
             return list(results.scalars().unique().all())
-    
-    async def get_files_for_chat(self, user_id: uuid.UUID, chat_id: uuid.UUID) -> List[UserDocument]:
+
+    async def get_files_for_chat(
+        self, user_id: uuid.UUID, chat_id: uuid.UUID
+    ) -> List[UserDocument]:
         async with PostgreSQLDatabase.get_session() as session:
-            stmt = select(UserDocument).where(UserDocument.user_id == user_id, UserDocument.chat_id == chat_id)
+            stmt = select(UserDocument).where(
+                UserDocument.user_id == user_id, UserDocument.chat_id == chat_id
+            )
             results = await session.execute(stmt)
             return list(results.scalars().unique().all())
-    
+
     async def del_files_for_chat(self, user_id: uuid.UUID, chat_id: uuid.UUID):
         async with PostgreSQLDatabase.get_session() as session:
-            stmt = delete(UserDocument).where(UserDocument.user_id == user_id, UserDocument.chat_id == chat_id)
+            stmt = delete(UserDocument).where(
+                UserDocument.user_id == user_id, UserDocument.chat_id == chat_id
+            )
             await session.execute(stmt)
             await session.commit()
-        
+
     async def delete_file(self, user_id: uuid.UUID, document_id: List[uuid.UUID]):
         async with PostgreSQLDatabase.get_session() as session:
             # Fetch all documents matching the provided document IDs
@@ -164,7 +193,7 @@ class DocumentService:
             if len(documents) != len(document_id):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="One or more files not found"
+                    detail="One or more files not found",
                 )
 
             # Check if all documents belong to the provided user_id
@@ -172,7 +201,7 @@ class DocumentService:
                 if document.user_id != user_id:
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail="You do not have permission to delete one or more files"
+                        detail="You do not have permission to delete one or more files",
                     )
 
             # Delete the documents
@@ -182,11 +211,11 @@ class DocumentService:
             await session.commit()
 
     async def get_relevant_docs(
-            self,
-            query: str,
-            top_k: int = 3,
-            search_pattern: str = "cosine",
-            state: Optional[dict] = None
+        self,
+        query: str,
+        top_k: int = 3,
+        search_pattern: str = "cosine",
+        state: Optional[dict] = None,
     ) -> List[Document]:
         """
         Retrieve relevant document chunks based on the user's query using either semantic or keyword search.
@@ -210,7 +239,10 @@ class DocumentService:
         await ws_manager.send_to_user(
             sid=state["user_id"],
             message_type="ToolProcess",
-            data={"chat_id": state["chat_id"], "content": "Retrieving relevant sections..."}
+            data={
+                "chat_id": state["chat_id"],
+                "content": "Retrieving relevant sections...",
+            },
         )
         self.embedding_model = await self.get_llm_from_model()
         # Step 1: Generate query embedding
@@ -221,8 +253,8 @@ class DocumentService:
                 stmt = (
                     select(DocumentChunk.chunk_id, DocumentChunk.content)
                     .join(
-                        UserDocument, 
-                        UserDocument.document_id == DocumentChunk.document_id
+                        UserDocument,
+                        UserDocument.document_id == DocumentChunk.document_id,
                     )
                     .where(
                         UserDocument.user_id == state["user_id"],
@@ -231,7 +263,7 @@ class DocumentService:
                     )
                     .limit(top_k)
                 )
-            else:    
+            else:
                 # Also supports max_inner_product, cosine_distance, l1_distance, hamming_distance, and jaccard_distance
                 distance_expr = DocumentChunk.embedding.cosine_distance(query_embedding)
                 stmt = (
@@ -240,12 +272,15 @@ class DocumentService:
                         DocumentChunk.content,
                         distance_expr.label("distance"),
                     )
-                    .join(UserDocument, UserDocument.document_id == DocumentChunk.document_id)
+                    .join(
+                        UserDocument,
+                        UserDocument.document_id == DocumentChunk.document_id,
+                    )
                     .where(
                         UserDocument.user_id == state["user_id"],
                         UserDocument.chat_id == uuid.UUID(state["chat_id"]),
                     )
-                    .order_by(distance_expr.asc()) # closest first = more relevant
+                    .order_by(distance_expr.asc())  # closest first = more relevant
                     .limit(top_k)
                 )
             results = (await session.execute(stmt)).all()
@@ -285,7 +320,7 @@ class DocumentService:
             raise
         finally:
             await file.close()
-            
+
     async def _load_and_split(self, file_path: str) -> list[Document]:
         """
         Detects file type, loads with the right LangChain loader,
@@ -305,7 +340,7 @@ class DocumentService:
     ):
         chunks = await self._load_and_split(path)
 
-        batch_size = 64                      # keep RAM low for giant docs
+        batch_size = 64  # keep RAM low for giant docs
         chunks_iter = iter(chunks)
 
         while batch := list(islice(chunks_iter, batch_size)):
@@ -343,24 +378,28 @@ class DocumentService:
             case ".eml" | ".msg":
                 return UnstructuredEmailLoader(file_path)
             # ── code & plain‑text fall‑through ─────────────────────────
-            case ".py" | ".js" | ".ts" | ".java" | ".go" | ".c" | ".cpp" | ".cs" | ".rs":
+            case (
+                ".py" | ".js" | ".ts" | ".java" | ".go" | ".c" | ".cpp" | ".cs" | ".rs"
+            ):
                 return TextLoader(file_path, autodetect_encoding=True)
             case ".md":
-                return TextLoader(file_path, autodetect_encoding=True)  # markdown handled via splitter
+                return TextLoader(
+                    file_path, autodetect_encoding=True
+                )  # markdown handled via splitter
             case _:
                 # default to plain text; you can plug UnstructuredFileLoader here
                 return TextLoader(file_path, autodetect_encoding=True)
-    
+
     def _pick_splitter(self, file_path: str):
         ext = Path(file_path).suffix.lower()
         # Large tables / slides / mail → keep chunks smaller
         table_like = {".csv", ".xlsx", ".xls", ".pptx", ".ppt", ".eml", ".msg"}
-        code_like  = {".py", ".js", ".ts", ".java", ".go", ".c", ".cpp", ".cs", ".rs"}
+        code_like = {".py", ".js", ".ts", ".java", ".go", ".c", ".cpp", ".cs", ".rs"}
 
         if ext in code_like:
             # token‑like splitting that respects code structure
             return RecursiveCharacterTextSplitter.from_language(
-                language=Language.PYTHON,         # good default for code
+                language=Language.PYTHON,  # good default for code
                 chunk_size=400,
                 chunk_overlap=40,
             )
@@ -371,7 +410,7 @@ class DocumentService:
 
         # fallback
         return RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=64)
-        
+
     # helper
     def _is_scanned_pdf(self, file_path: str, max_pages: int = 3) -> bool:
         """
@@ -386,8 +425,9 @@ class DocumentService:
         except Exception:
             # On any parsing error assume scanned to be safe
             return True
-    
+
     @staticmethod
     def _pg_conn_str() -> str:
         from core.database import DATABASE_URL
+
         return DATABASE_URL

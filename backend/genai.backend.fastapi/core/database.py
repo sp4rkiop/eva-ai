@@ -16,17 +16,15 @@ logger = logging.getLogger(__name__)
 
 # Async database engine and session factory
 DATABASE_URL = f"postgresql+asyncpg://{quote_plus(settings.POSTGRES_USER)}:{quote_plus(settings.POSTGRES_PASSWORD)}@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}/{quote_plus(settings.POSTGRES_DB)}"
-engine = create_async_engine(
-    DATABASE_URL,
-    pool_pre_ping=True
-)
+engine = create_async_engine(DATABASE_URL, pool_pre_ping=True)
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
     autocommit=False,
     autoflush=False,
     expire_on_commit=False,
-    class_=AsyncSession
+    class_=AsyncSession,
 )
+
 
 class PostgreSQLDatabase:
     @classmethod
@@ -38,7 +36,7 @@ class PostgreSQLDatabase:
         try:
             async with engine.begin() as conn:
                 # Enable pgcrypto for UUID generation
-                await conn.execute(text("CREATE EXTENSION IF NOT EXISTS \"pgcrypto\";"))
+                await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "pgcrypto";'))
                 # Enable vector extension
                 await conn.execute(text('CREATE EXTENSION IF NOT EXISTS "vector";'))
                 # Create all tables defined in the ORM models

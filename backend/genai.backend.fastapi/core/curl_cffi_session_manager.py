@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator, Optional, Dict
 from curl_cffi.requests import AsyncSession
 
+
 class CurlCFFIAsyncSession:
     _session: Optional[AsyncSession] = None
 

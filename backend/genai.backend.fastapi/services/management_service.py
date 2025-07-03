@@ -19,12 +19,13 @@ logger = logging.getLogger(__name__)
 
 MAX_LIMIT = 100  # hard safety cap
 
+
 class ManagementService:
     @staticmethod
     async def get_all_models() -> List[AiModels]:
         """
         Get all models.
-            
+
         Returns:
             List of models or empty list
         """
@@ -37,21 +38,23 @@ class ManagementService:
                 stmt = select(AiModels)
                 result = await session.execute(stmt)
                 ai_models = result.scalars().all()
-                
+
                 model_list = list(ai_models)
-                #save into cache
-                CacheRepository.set("all_models", model_list, 86400) # 86400 seconds = 1 day
+                # save into cache
+                CacheRepository.set(
+                    "all_models", model_list, 86400
+                )  # 86400 seconds = 1 day
                 return list(model_list)
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get models: {str(ex)}", exc_info=True)
             raise Exception(f"Failed to get models: {str(ex)}")
-        
+
     async def get_users_details_paginated(
         self,
         page_size: int = 5,
         search_query: Optional[str] = None,
-        cursor: Optional[str] = None
+        cursor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Key‑set paginated users + pure‑SQL aggregations:
@@ -65,15 +68,15 @@ class ManagementService:
         async with PostgreSQLDatabase.get_session() as session:
             # --- 1) Page Users table only --------------------------------
             user_stmt = select(Users)
-            
+
             search_query = q_from_cursor if q_from_cursor is not None else search_query
-            
+
             if search_query is not None and search_query.strip() != "":
                 user_stmt = user_stmt.where(
                     or_(
                         Users.first_name.ilike(f"%{search_query}%"),
                         Users.last_name.ilike(f"%{search_query}%"),
-                        Users.email.ilike(f"%{search_query}%")
+                        Users.email.ilike(f"%{search_query}%"),
                     )
                 )
 
@@ -96,11 +99,27 @@ class ManagementService:
             # build cursors
             if page:
                 if forward:
-                    next_cur = encode_cursor(page[-1].user_id, True, search_query) if has_more else None
-                    prev_cur = encode_cursor(page[0].user_id, False, search_query) if last_id else None
+                    next_cur = (
+                        encode_cursor(page[-1].user_id, True, search_query)
+                        if has_more
+                        else None
+                    )
+                    prev_cur = (
+                        encode_cursor(page[0].user_id, False, search_query)
+                        if last_id
+                        else None
+                    )
                 else:
-                    next_cur = encode_cursor(page[0].user_id, True, search_query) if last_id else None
-                    prev_cur = encode_cursor(page[-1].user_id, False, search_query) if has_more else None
+                    next_cur = (
+                        encode_cursor(page[0].user_id, True, search_query)
+                        if last_id
+                        else None
+                    )
+                    prev_cur = (
+                        encode_cursor(page[-1].user_id, False, search_query)
+                        if has_more
+                        else None
+                    )
             else:
                 next_cur = prev_cur = None
 
@@ -111,8 +130,10 @@ class ManagementService:
                 select(
                     ChatHistory.user_id,
                     func.count().label("chat_count"),
-                    func.coalesce(func.sum(ChatHistory.token_count), 0).label("total_tokens"),
-                    func.max(ChatHistory.last_updated).label("latest_activity")
+                    func.coalesce(func.sum(ChatHistory.token_count), 0).label(
+                        "total_tokens"
+                    ),
+                    func.max(ChatHistory.last_updated).label("latest_activity"),
                 )
                 .where(ChatHistory.user_id.in_(paged_ids))
                 .group_by(ChatHistory.user_id)
@@ -135,7 +156,7 @@ class ManagementService:
                     Subscriptions.user_id.label("uid"),
                     AiModels.model_id,
                     AiModels.model_name,
-                    AiModels.provider
+                    AiModels.provider,
                 )
                 .join(AiModels, Subscriptions.model_id == AiModels.model_id)
                 .where(Subscriptions.user_id.in_(paged_ids))
@@ -143,28 +164,31 @@ class ManagementService:
             sub_rows = await session.execute(subq)
             subs_map: Dict[uuid.UUID, List[Dict[str, Any]]] = {}
             for uid, model_id, name, provider in sub_rows:
-                subs_map.setdefault(uid, []).append({
-                    "model_id": model_id,
-                    "model_name": name,
-                    "provider": provider
-                })
+                subs_map.setdefault(uid, []).append(
+                    {"model_id": model_id, "model_name": name, "provider": provider}
+                )
 
             # --- 4) Build final payload ---------------------------------
             users_payload: List[Dict[str, Any]] = []
             for u in page:
-                stats = agg_map.get(u.user_id, {"chat_count": 0, "total_tokens": 0, "latest_activity": None})
-                users_payload.append({
-                    "user_id":      u.user_id,
-                    "email":        u.email,
-                    "first_name":   u.first_name,
-                    "last_name":    u.last_name,
-                    "role":         u.role,
-                    "partner":      u.partner,
-                    "chat_count":   stats["chat_count"],
-                    "total_tokens": stats["total_tokens"],
-                    "latest_activity": stats["latest_activity"],
-                    "models_sub":   subs_map.get(u.user_id, []),
-                })
+                stats = agg_map.get(
+                    u.user_id,
+                    {"chat_count": 0, "total_tokens": 0, "latest_activity": None},
+                )
+                users_payload.append(
+                    {
+                        "user_id": u.user_id,
+                        "email": u.email,
+                        "first_name": u.first_name,
+                        "last_name": u.last_name,
+                        "role": u.role,
+                        "partner": u.partner,
+                        "chat_count": stats["chat_count"],
+                        "total_tokens": stats["total_tokens"],
+                        "latest_activity": stats["latest_activity"],
+                        "models_sub": subs_map.get(u.user_id, []),
+                    }
+                )
 
             # reverse order for backward paging
             if not forward:
@@ -176,7 +200,7 @@ class ManagementService:
                 "next_cursor": next_cur,
                 "prev_cursor": prev_cur,
             }
-        
+
     async def get_models_paginated(
         self,
         page_size: int = 5,
@@ -208,10 +232,9 @@ class ManagementService:
                         AiModels.deployment_name.ilike(f"%{search_query}%"),
                         AiModels.model_name.ilike(f"%{search_query}%"),
                         AiModels.provider.ilike(f"%{search_query}%"),
-                        AiModels.model_type.ilike(f"%{search_query}%")
+                        AiModels.model_type.ilike(f"%{search_query}%"),
                     )
                 )
-
 
             if forward:
                 stmt = stmt.order_by(AiModels.model_id.asc())
@@ -229,11 +252,27 @@ class ManagementService:
             has_more = len(rows) == page_size + 1
 
             if forward:
-                next_cur = encode_cursor(slice_[-1].model_id, True, search_query) if has_more else None
-                prev_cur = encode_cursor(slice_[0].model_id, False, search_query) if last_id else None
+                next_cur = (
+                    encode_cursor(slice_[-1].model_id, True, search_query)
+                    if has_more
+                    else None
+                )
+                prev_cur = (
+                    encode_cursor(slice_[0].model_id, False, search_query)
+                    if last_id
+                    else None
+                )
             else:
-                next_cur = encode_cursor(slice_[0].model_id, True, search_query) if last_id else None
-                prev_cur = encode_cursor(slice_[-1].model_id, False, search_query) if has_more else None
+                next_cur = (
+                    encode_cursor(slice_[0].model_id, True, search_query)
+                    if last_id
+                    else None
+                )
+                prev_cur = (
+                    encode_cursor(slice_[-1].model_id, False, search_query)
+                    if has_more
+                    else None
+                )
 
             models = slice_ if forward else list(reversed(slice_))
 
@@ -257,8 +296,6 @@ class ManagementService:
                 "prev_cursor": prev_cur,
             }
 
-    
-
     async def get_usage_data(
         self,
         last_days: int = 7,
@@ -268,13 +305,13 @@ class ManagementService:
 
         Returns:
             [{ "date": "2024-04-01", "tokens_used": 1234 }, ...]
-        """        
+        """
         async with PostgreSQLDatabase.get_session() as session:
             last_date = date.today() - timedelta(days=last_days)
             stmt = (
                 select(
                     cast(ChatHistory.last_updated, Date).label("usage_date"),
-                    func.sum(ChatHistory.token_count).label("tokens_used")
+                    func.sum(ChatHistory.token_count).label("tokens_used"),
                 )
                 .where(ChatHistory.last_updated >= last_date)
                 .group_by(cast(ChatHistory.last_updated, Date))
@@ -289,7 +326,6 @@ class ManagementService:
 
     async def get_analytics_home_data(self):
         async with PostgreSQLDatabase.get_session() as session:
-
             # Total users
             stmt = select(func.count(Users.user_id))
             total_users = (await session.execute(stmt)).scalar()
@@ -298,12 +334,20 @@ class ManagementService:
             usage_data = await self.get_usage_data(last_days=90)
 
             # Active models
-            stmt = select(func.count(AiModels.model_id)).where(AiModels.is_active == True)
+            stmt = select(func.count(AiModels.model_id)).where(
+                AiModels.is_active == True
+            )
             active_models = (await session.execute(stmt)).scalar()
 
             # Recent 3 user by their last chat time
             stmt = (
-                select(Users.user_id, Users.first_name, Users.last_name, Users.email, func.max(ChatHistory.last_updated).label("last_active"))
+                select(
+                    Users.user_id,
+                    Users.first_name,
+                    Users.last_name,
+                    Users.email,
+                    func.max(ChatHistory.last_updated).label("last_active"),
+                )
                 .join(ChatHistory, Users.user_id == ChatHistory.user_id)
                 .group_by(Users.user_id, Users.first_name, Users.last_name, Users.email)
                 .order_by(func.max(ChatHistory.last_updated).desc())
@@ -325,66 +369,88 @@ class ManagementService:
                 "total_users": total_users,
                 "usage_chat": usage_data,
                 "active_models": active_models,
-                "recent_users": recent_users
+                "recent_users": recent_users,
             }
-    
-    #Altering functions
+
+    # Altering functions
     async def modify_user(self, user_id: uuid.UUID, query_params: Dict[str, Any]):
         async with PostgreSQLDatabase.get_session() as session:
             user = await session.get(Users, user_id)
             if user is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-            if query_params.get('role'):
-                user.role = query_params['role'].lower() if query_params['role'].lower() in ['user', 'premium','admin'] else user.role
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+                )
+            if query_params.get("role"):
+                user.role = (
+                    query_params["role"].lower()
+                    if query_params["role"].lower() in ["user", "premium", "admin"]
+                    else user.role
+                )
                 user_service = UserService()
-                await user_service.delete_all_user_sessions(user_id) # Delete all sessions for the user to force them to re-authenticate
-            
-            if query_params.get('model_id') is not None :
-                model_id = uuid.UUID(query_params['model_id']) if isinstance(query_params['model_id'], str) else query_params['model_id'] 
+                await user_service.delete_all_user_sessions(
+                    user_id
+                )  # Delete all sessions for the user to force them to re-authenticate
+
+            if query_params.get("model_id") is not None:
+                model_id = (
+                    uuid.UUID(query_params["model_id"])
+                    if isinstance(query_params["model_id"], str)
+                    else query_params["model_id"]
+                )
                 model = await session.get(AiModels, model_id)
                 if model is None:
-                    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
-                
-                new_sub = Subscriptions(
-                    user_id=user_id,
-                    model_id=model_id
-                )
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
+                    )
+
+                new_sub = Subscriptions(user_id=user_id, model_id=model_id)
                 session.add(new_sub)
             await session.commit()
-    
+
     async def delete_user(self, user_id: uuid.UUID):
         async with PostgreSQLDatabase.get_session() as session:
             user = await session.get(Users, user_id)
             if user is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+                )
             await session.delete(user)
             await session.commit()
             user_service = UserService()
-            await user_service.delete_all_user_sessions(user_id) # Delete all sessions for the user
+            await user_service.delete_all_user_sessions(
+                user_id
+            )  # Delete all sessions for the user
 
     async def modify_model(self, model_id: uuid.UUID, query_params: Dict[str, Any]):
         async with PostgreSQLDatabase.get_session() as session:
             model = await session.get(AiModels, model_id)
             if model is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
-            if query_params.get('is_active') is not None and isinstance(query_params['is_active'], bool):
-                model.is_active = query_params['is_active']
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
+                )
+            if query_params.get("is_active") is not None and isinstance(
+                query_params["is_active"], bool
+            ):
+                model.is_active = query_params["is_active"]
             else:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid is_active value")
-            if query_params.get('model_name'):
-                model.model_name = query_params['model_name']
-            if query_params.get('model_type'):
-                model.model_type = query_params['model_type']
-            if query_params.get('provider'):
-                model.provider = query_params['provider']
-            if query_params.get('api_key'):
-                model.api_key = query_params['api_key']
-            if query_params.get('endpoint'):
-                model.endpoint = query_params['endpoint']
-            if query_params.get('deployment_name'):
-                model.deployment_name = query_params['deployment_name']
-            if query_params.get('model_version'):
-                model.model_version = query_params['model_version']
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid is_active value",
+                )
+            if query_params.get("model_name"):
+                model.model_name = query_params["model_name"]
+            if query_params.get("model_type"):
+                model.model_type = query_params["model_type"]
+            if query_params.get("provider"):
+                model.provider = query_params["provider"]
+            if query_params.get("api_key"):
+                model.api_key = query_params["api_key"]
+            if query_params.get("endpoint"):
+                model.endpoint = query_params["endpoint"]
+            if query_params.get("deployment_name"):
+                model.deployment_name = query_params["deployment_name"]
+            if query_params.get("model_version"):
+                model.model_version = query_params["model_version"]
             await session.commit()
             await self.get_all_models()
 
@@ -398,7 +464,7 @@ class ManagementService:
                 endpoint=model_data.endpoint,
                 deployment_name=model_data.deployment_name,
                 model_version=model_data.model_version,
-                is_active=model_data.is_active
+                is_active=model_data.is_active,
             )
             session.add(new_model)
             await session.commit()
@@ -409,7 +475,9 @@ class ManagementService:
         async with PostgreSQLDatabase.get_session() as session:
             model = await session.get(AiModels, model_id)
             if model is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
+                )
             await session.delete(model)
             await session.commit()
             await self.get_all_models()

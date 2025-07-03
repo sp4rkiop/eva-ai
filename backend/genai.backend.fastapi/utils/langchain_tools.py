@@ -1,21 +1,19 @@
 from langchain.tools import Tool, StructuredTool
 from typing import List
 from services.document_service import DocumentRetrieverTool, DocumentService
-from .py_code_runner import current_utc_date_time, python_code_runner, PythonCodeRunnerInput, CurrentUtcDateTimeInput
-from .web_search import WebSearchService, ScrapUrlListInput, SearchInput
+from .extended_tools import (
+    current_utc_date_time,
+    python_code_runner,
+    PythonCodeRunnerInput,
+    CurrentUtcDateTimeInput,
+)
+from .web_search import WebSearchService, CrawlUrlListInput, SearchInput
 
 
 def get_tools() -> List[Tool | StructuredTool]:
     web = WebSearchService()
     doc = DocumentService()
     return [
-        StructuredTool.from_function(
-            func=web.scrap_url_list,
-            coroutine=web.scrap_url_list,
-            name=web.scrap_url_list.__getattribute__("__name__"),
-            description=web.scrap_url_list.__getattribute__("__doc__"),
-            args_schema=ScrapUrlListInput,
-        ),
         StructuredTool.from_function(
             func=web.search,
             coroutine=web.search,
@@ -24,10 +22,18 @@ def get_tools() -> List[Tool | StructuredTool]:
             args_schema=SearchInput,
         ),
         StructuredTool.from_function(
+            func=web.crawl_url_list,
+            coroutine=web.crawl_url_list,
+            name=web.crawl_url_list.__getattribute__("__name__"),
+            description=web.crawl_url_list.__getattribute__("__doc__"),
+            args_schema=CrawlUrlListInput,
+        ),
+        StructuredTool.from_function(
             func=doc.get_relevant_docs,
             coroutine=doc.get_relevant_docs,
             name=doc.get_relevant_docs.__getattribute__("__name__"),
-            description="Use to get relevant content from Files when you don't know the question. " + doc.get_relevant_docs.__getattribute__("__doc__"),
+            description="Use for browsing the files uploaded by the user when answering a question that might be related to a file. "
+            + doc.get_relevant_docs.__getattribute__("__doc__"),
             args_schema=DocumentRetrieverTool,
         ),
         StructuredTool.from_function(

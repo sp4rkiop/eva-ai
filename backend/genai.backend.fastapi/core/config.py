@@ -1,8 +1,17 @@
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
+from pathlib import Path
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Define the relative path to the prompt.md file
+file_path = Path.cwd() / "utils" / "prompt.md"
+
+# Read the system prompt from the file
+with open(file_path, "r") as f:
+    prompt = f.read() or "You are a helpful assistant."
+
 
 class Settings(BaseSettings):
     DEFAULT_MODEL_ID: str = "1"
@@ -13,7 +22,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_ADMIN: int = 60
     RATE_LIMIT_USER: int = 14
     RATE_LIMIT_ANONYMOUS: int = 5
-    SYSTEM_PROMPT: str = "You are eva, a helpful assistant."
+    SYSTEM_PROMPT: str = prompt
     POSTGRES_USER: str = "dev_user"
     POSTGRES_PASSWORD: str = "dev_password"
     POSTGRES_HOST: str = "localhost"
@@ -30,5 +39,6 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
 
 settings = Settings()
