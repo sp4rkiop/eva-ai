@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     OPENROUTER_TOKEN: str = "YOUR_OPENROUTER_TOKEN"
     AZURE_OPENAI_ENDPOINT: str = "YOUR_AZURE_OPENAI_API_BASE"
     AZURE_OPENAI_API_KEY: str = "YOUR_AZURE_OPENAI_API_KEY"
-    AZURE_OPENAI_API_VERSION: str = "2024-10-21"
+    AZURE_OPENAI_API_VERSION: str = "2025-04-01-preview"
 
     class Config:
         env_file = ".env"

@@ -32,7 +32,7 @@ def get_tools() -> List[Tool | StructuredTool]:
             func=doc.get_relevant_docs,
             coroutine=doc.get_relevant_docs,
             name=doc.get_relevant_docs.__getattribute__("__name__"),
-            description="Use for browsing the files uploaded by the user when answering a question that might be related to a file. "
+            description="Extract information from files uploaded by user. "
             + doc.get_relevant_docs.__getattribute__("__doc__"),
             args_schema=DocumentRetrieverTool,
         ),

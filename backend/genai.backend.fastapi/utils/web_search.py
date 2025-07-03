@@ -61,6 +61,7 @@ class WebSearchService:
         Perform a web search to access up-to-date information from the web or when responding to the user requires information about their location.
         Get a list of search results in the format {'title': title of page, 'url': url, 'description': short description of page related to query}.
         It can fail to return results if the request fails. So do not spam it.
+
         Args:
             query (str): The search query string.
             latest_by (str, optional): Filter results by recency. Use 'd' for day, 'w' for week, 'm' for month, 'y' for year.
@@ -151,10 +152,10 @@ class WebSearchService:
         """
         Crawl a list of URLs and get a dictionary with the URL as the key and the list of relevant chunks of crawled content as the value.
         It can fail if the URL is not valid or if the request fails. So do not spam it.
+
         Args:
             url_list (list[str]): A list of URLs to be crawled.
-            query (str): The search query string which will be used to get relevent (simple keyword match) content from crawled data.
-            Try to keep as much relevant keywords as possible in the query to get better results.
+            query (str): The search query keywords which will be used to get relevent (simple keyword match) content from crawled data. Try to keep as much relevant keywords as possible in the query to get better results.
 
         Returns:
             Optional[Dict[str, str]]: A dictionary with the crawled content, or None if an error occurred
