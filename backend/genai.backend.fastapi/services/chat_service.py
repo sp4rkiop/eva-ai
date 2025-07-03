@@ -38,12 +38,12 @@ class ChatService:
         self.parser = StrOutputParser()
         self.llm: AzureChatOpenAI
         self.store = {}
-        self.history_limit = 4
+        self.history_limit = 6
         self.branch = "main"
         self.user_service = UserService()
         self.workflow = self.create_workflow()
 
-    def get_llm_from_model(self, model: AiModels) -> AzureChatOpenAI:
+    def get_llm_from_model(self, model: AiModels, temp: float) -> AzureChatOpenAI:
         """
         Initializes and returns an AzureChatOpenAI instance using the model's details.
         """
@@ -52,7 +52,7 @@ class ChatService:
             api_key=SecretStr(model.api_key),
             azure_deployment=model.deployment_name,
             api_version=settings.AZURE_OPENAI_API_VERSION,
-            temperature=0.01,
+            temperature=temp,
             stream_usage=True,
         )
 
@@ -234,6 +234,7 @@ class ChatService:
         user_id: uuid.UUID,
         model_id: uuid.UUID,
         user_input: str,
+        temperature: float,
         chat_id: Optional[uuid.UUID] = None,
     ) -> ChatResponse:
         """
@@ -281,7 +282,7 @@ class ChatService:
                         success=False, error_message="Selected model not available"
                     )
                 # Initialize LLM from selected model
-                self.llm = self.get_llm_from_model(selected_model)
+                self.llm = self.get_llm_from_model(selected_model, temperature)
                 new_chat_id = await self.lanchain_chat(user_id, user_input, chat_id)
                 return ChatResponse(success=True, chat_id=new_chat_id)
 

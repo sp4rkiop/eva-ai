@@ -22,6 +22,7 @@ async def ai_chat(
             user_id=uuid.UUID(payload["user_id"]),
             model_id=chat_request.model_id,
             user_input=chat_request.user_input,
+            temperature=chat_request.temperature or 0.5,
             chat_id=chat_request.chat_id,
         )
     except Exception as e:

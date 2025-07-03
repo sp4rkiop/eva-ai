@@ -11,6 +11,7 @@ from .base import Base
 if TYPE_CHECKING:
     from models.user_document_model import UserDocument
 
+
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
 
@@ -22,7 +23,10 @@ class DocumentChunk(Base):
             "embedding",
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
-            postgresql_with={"m": 16, "ef_construction": 64},  # tuned for medium corpora
+            postgresql_with={
+                "m": 16,
+                "ef_construction": 64,
+            },  # tuned for medium corpora
         ),
     )
 
@@ -30,13 +34,15 @@ class DocumentChunk(Base):
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     document_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), 
-        ForeignKey("user_documents.document_id", ondelete="CASCADE"), 
+        PG_UUID(as_uuid=True),
+        ForeignKey("user_documents.document_id", ondelete="CASCADE"),
         nullable=False,
-        index=True # simple B-tree for equality filter
+        index=True,  # simple B-tree for equality filter
     )
     content: Mapped[str] = mapped_column(nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(Vector(1536), nullable=False)  # 1536 for OpenAI
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(1536), nullable=False
+    )  # 1536 for OpenAI
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
