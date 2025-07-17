@@ -458,7 +458,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                         <div ref={getOrCreateRef(chatTitle.id)} className={`relative pt-1 pb-1 overflow-x-hidden group`}>
                           <Dialog>
                             <ContextMenu>
-                              <ContextMenuTrigger className={`group flex items-center h-8 rounded-md px-2 font-medium hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
+                              <ContextMenuTrigger className={`group flex items-center h-8 rounded-md px-2 hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
                                 <button
                                   className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
                                   onClick={(e) => {
@@ -471,7 +471,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                                 >{chatTitle.title}</button>
                               </ContextMenuTrigger>
                               <ContextMenuContent>
-                                <DialogTrigger className="block w-full text-left text-sm"><ContextMenuItem>Rename</ContextMenuItem></DialogTrigger>
+                                <DialogTrigger className="block w-full text-left text-sm"><ContextMenuItem>Edit</ContextMenuItem></DialogTrigger>
                                 <ContextMenuItem onClick={() => { handleDelete(chatTitle.id, back_auth) }}>Delete</ContextMenuItem>
                               </ContextMenuContent>
                             </ContextMenu>
@@ -483,7 +483,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                   <DialogTrigger className="block w-full text-left text-sm">
-                                    <DropdownMenuItem >Rename</DropdownMenuItem>
+                                    <DropdownMenuItem >Edit</DropdownMenuItem>
                                   </DialogTrigger>
                                   <DropdownMenuItem onClick={() => { handleDelete(chatTitle.id, back_auth) }}>
                                     Delete

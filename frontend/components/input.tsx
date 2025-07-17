@@ -178,7 +178,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
     };
 
     return (
-        <div className="w-auto pt-2 md:pt-0 mx-2 lg:mx-auto lg:w-4/5 lg:max-w-3xl dark:border-white/20 md:border-transparent md:dark:border-transparent">
+        <div className="w-auto pt-2 mx-2 lg:mx-auto lg:w-4/5 lg:max-w-3xl dark:border-white/20 md:border-transparent md:dark:border-transparent">
             {selectedFiles.length > 0 && (
                 <div className="flex pb-2 space-x-1 overflow-x-scroll">
                     {selectedFiles.map((file, index) => (

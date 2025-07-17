@@ -549,7 +549,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                       {(messages.length > 0) &&
                         (messages.map((message, index) => (
                           <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 md:mb-6 `}>
-                            <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] group'>
+                            <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-2xl xl:max-w-[48rem] group'>
                               <div className="hidden flex-shrink-0 md:flex flex-col relative items-end">
                                 <div>
                                   <div className="pt-0.5">
@@ -578,7 +578,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                                   {message.role === 'user' ? (fName) : ('Eva')}
                                 </div>
                                 <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
-                                  <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-gray-300 dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
+                                  <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-[#f9f9f9] dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
                                     {message.isPlaceholder ?
                                       (toolMessage.length > 0 ? <ToolMessageLoader /> : <SkeletonLoader />)
                                       : (
