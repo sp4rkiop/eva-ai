@@ -425,7 +425,7 @@ class ChatService:
                 ]
             )
             chain = prompt | self.llm
-            response = await chain.ainvoke({"input": user_input})
+            response = await chain.ainvoke({"input": " ".join(user_input.split()[:30])})
             raw_content = response.content
             if isinstance(raw_content, str):
                 clear_output = re.sub(r'^"(.*)"$', r"\1", raw_content)
