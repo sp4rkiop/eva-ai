@@ -59,7 +59,7 @@ class WebSearchService:
     ) -> Optional[list]:  # https://duckduckgo.com/duckduckgo-help-pages/settings/params
         """
         Perform a web search to access up-to-date information from the web or when responding to the user requires information about their location.
-        Get a list of search results in the format {'title': title of page, 'url': url, 'description': short description of page related to query}.
+        Get a list of search results in the format {'title': title of page, 'url': url, 'description': content from url related to query}.
         It can fail to return results if the request fails. So do not spam it.
 
         Args:
@@ -86,7 +86,7 @@ class WebSearchService:
                     message_type="ToolProcess",
                     data={
                         "chat_id": state["chat_id"],
-                        "content": "Searching the web...",
+                        "content": "Initiating web search...",
                     },
                 )
             async with CurlCFFIAsyncSession.get_session() as ssn:
@@ -125,7 +125,7 @@ class WebSearchService:
                                 message_type="ToolProcess",
                                 data={
                                     "chat_id": state["chat_id"],
-                                    "content": "Got few results...",
+                                    "content": "Retrieved a few relevant search results...",
                                 },
                             )
                         return search_result
@@ -168,7 +168,9 @@ class WebSearchService:
                     message_type="ToolProcess",
                     data={
                         "chat_id": state["chat_id"],
-                        "content": "Extracting content from the link...",
+                        "content": "Crawling " + str(len(url_list)) + " Page" + "s"
+                        if len(url_list) > 1
+                        else "" + "...",
                     },
                 )
             async with CurlCFFIAsyncSession.get_session() as s:
@@ -244,7 +246,7 @@ class WebSearchService:
                         message_type="ToolProcess",
                         data={
                             "chat_id": state["chat_id"],
-                            "content": "Extraction completed...",
+                            "content": "Crawling completed...",
                         },
                     )
                 return scrap_result
