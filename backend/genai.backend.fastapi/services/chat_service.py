@@ -63,16 +63,9 @@ class ChatService:
 
     def get_valid_chat_history(self, limit: int = 4) -> List[BaseMessage]:
         history = self.get_chat_history_by_branch(self.branch).messages[-limit:]
-        valid_messages = []
-
-        # Filter out any ToolMessage at the start of the history, as
-        # they don't make sense in the context of a chat history.
-        if len(history) > 1 and isinstance(history[0], ToolMessage):
-            valid_messages = history[1:]
-        else:
-            valid_messages = history
-
-        return valid_messages
+        while history and isinstance(history[0], ToolMessage):
+            history.pop(0)
+        return history
 
     def create_branch_from(
         self,
