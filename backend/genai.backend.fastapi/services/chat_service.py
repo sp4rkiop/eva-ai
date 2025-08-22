@@ -72,7 +72,6 @@ class ChatService:
         parent_branch: str,
         new_branch: str,
         edit_index: int,
-        new_message: BaseMessage,
     ):
         parent_history = self.store.get(parent_branch)
         if not parent_history:
@@ -82,8 +81,6 @@ class ChatService:
         new_history = InMemoryHistory(
             messages=deepcopy(parent_history.messages[:edit_index])
         )
-        # Add the new edited message
-        new_history.add_messages([new_message])
         # Store the new branch
         self.store[new_branch] = new_history
 
@@ -227,8 +224,11 @@ class ChatService:
         user_id: uuid.UUID,
         model_id: uuid.UUID,
         user_input: str,
+        branch: str,
         temperature: float,
         chat_id: Optional[uuid.UUID] = None,
+        parent_branch: Optional[str] = None,
+        edit_index: Optional[int] = None,
     ) -> ChatResponse:
         """
         Checks if a model is subscribed by a user and runs the chat shield on the given input.
@@ -276,7 +276,14 @@ class ChatService:
                     )
                 # Initialize LLM from selected model
                 self.llm = self.get_llm_from_model(selected_model, temperature)
-                new_chat_id = await self.lanchain_chat(user_id, user_input, chat_id)
+
+                # Handle edit case - create new branch from parent
+                if parent_branch and edit_index is not None:
+                    self.create_branch_from(parent_branch, branch, edit_index)
+
+                new_chat_id = await self.lanchain_chat(
+                    user_id, user_input, chat_id, branch
+                )
                 return ChatResponse(success=True, chat_id=new_chat_id)
 
         except openai.BadRequestError as e:

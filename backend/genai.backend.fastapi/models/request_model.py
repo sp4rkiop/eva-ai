@@ -17,6 +17,16 @@ class DeleteRequest(BaseModel):
 class ChatRequest(BaseModel):
     model_id: uuid.UUID
     user_input: str
+    branch: Optional[str] = None
+    temperature: Optional[float] = None
+    chat_id: Optional[uuid.UUID] = None
+
+
+class EditMessageRequest(BaseModel):
+    model_id: uuid.UUID
+    parent_branch: str
+    edit_index: int
+    new_message: str
     temperature: Optional[float] = None
     chat_id: Optional[uuid.UUID] = None
 
