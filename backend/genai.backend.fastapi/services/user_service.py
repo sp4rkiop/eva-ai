@@ -398,7 +398,7 @@ class UserService:
                     .where(
                         AiModels.model_id == model_id,
                         Subscriptions.user_id == user_id,
-                        AiModels.is_active == True,
+                        AiModels.is_active,
                     )
                 )
                 result = await session.execute(stmt)

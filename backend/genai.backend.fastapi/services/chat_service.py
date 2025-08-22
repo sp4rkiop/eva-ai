@@ -277,12 +277,17 @@ class ChatService:
                 # Initialize LLM from selected model
                 self.llm = self.get_llm_from_model(selected_model, temperature)
 
+                chat_history_data = None
                 # Handle edit case - create new branch from parent
-                if parent_branch and edit_index is not None:
+                if parent_branch and edit_index and chat_id is not None:
+                    chat_history_data = await self.user_service.get_single_conversation(
+                        user_id, chat_id
+                    )
+                    self.store = chat_history_data["conversation"]
                     self.create_branch_from(parent_branch, branch, edit_index)
 
                 new_chat_id = await self.lanchain_chat(
-                    user_id, user_input, chat_id, branch
+                    user_id, user_input, branch, chat_id, chat_history_data
                 )
                 return ChatResponse(success=True, chat_id=new_chat_id)
 
@@ -331,8 +336,9 @@ class ChatService:
         self,
         user_id: uuid.UUID,
         user_input: str,
-        chat_id: Optional[uuid.UUID] = None,
         branch: str = "main",
+        chat_id: Optional[uuid.UUID] = None,
+        chat_history_data: Optional[dict] = None,
     ) -> Optional[uuid.UUID]:
         """
         Handles a single chat message from a user.
@@ -367,12 +373,14 @@ class ChatService:
 
             # Load existing chat history if available
             if chat_id:
-                chat_history_data = await self.user_service.get_single_conversation(
-                    user_id, chat_id
-                )
+                if chat_history_data is None:
+                    chat_history_data = await self.user_service.get_single_conversation(
+                        user_id, chat_id
+                    )
 
                 doc_data = chat_history_data["files"]
-                self.store = chat_history_data["conversation"]
+                if self.store == {}:
+                    self.store = chat_history_data["conversation"]
                 state["chat_title"] = chat_history_data["title"]
                 state["token_usage"] = chat_history_data["token_consumed"]
 
