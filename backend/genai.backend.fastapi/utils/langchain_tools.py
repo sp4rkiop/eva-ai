@@ -36,14 +36,14 @@ def get_tools() -> List[Tool | StructuredTool]:
             + doc.get_relevant_docs.__getattribute__("__doc__"),
             args_schema=DocumentRetrieverTool,
         ),
-        # StructuredTool.from_function(
-        #     func=python_code_runner,
-        #     coroutine=python_code_runner,
-        #     name=python_code_runner.__getattribute__("__name__"),
-        #     description=python_code_runner.__getattribute__("__doc__"),
-        #     return_direct=True,
-        #     args_schema=PythonCodeRunnerInput,
-        # ),
+        StructuredTool.from_function(
+            func=python_code_runner,
+            coroutine=python_code_runner,
+            name=python_code_runner.__getattribute__("__name__"),
+            description=python_code_runner.__getattribute__("__doc__"),
+            return_direct=True,
+            args_schema=PythonCodeRunnerInput,
+        ),
         Tool.from_function(
             func=current_utc_date_time,
             coroutine=current_utc_date_time,

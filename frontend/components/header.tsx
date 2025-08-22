@@ -132,7 +132,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
   };
 
   const getResponseTypeLabel = (value: number): string => {
-    if (value === 0) return 'Strict';
+    if (value === 0) return 'Precise';
     if (value === 0.5) return 'Neutral';
     if (value === 1) return 'Creative';
     return 'Neutral';
@@ -174,7 +174,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex items-center gap-1 mr-2">
+      <div className="flex items-center gap-1 mr-2 md:mr-4">
         <div className="flex flex-row items-center gap-2">
           <span className="hidden md:block text-xs text-gray-600 dark:text-zinc-200 uppercase">
             Response Type

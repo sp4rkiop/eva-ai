@@ -9,7 +9,7 @@ import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import { ChatService } from '@/lib/service';
 import { useSession } from "next-auth/react";
-import { CodeBlock, generateRandomString } from './ui/codeblock';
+import { CodeBlock, } from './ui/codeblock';
 import { MemoizedReactMarkdown } from './markdown';
 import LoadingSpinner from './ui/loading-spinner';
 import { ButtonScrollToBottom } from './ui/button-scroll-to-bottom';
@@ -20,7 +20,7 @@ import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
 import { authenticateUser } from '@/lib/utils';
 import { MessageActions } from './message-actions';
-import { Loader2, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import DocumentManager from './document-manager';
 
@@ -436,25 +436,25 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
   const SkeletonLoader = () => (
     <div className="mt-1 flex flex-col space-y-2 animate-pulse w-fit md:w-[calc(100%-2rem)]">
       <div className="flex items-center w-full">
-        <div className="h-2.5 bg-gray-200 rounded-full dark:bg-gray-700 w-40"></div>
-        <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-24"></div>
-        <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
+        <div className="h-2.5 bg-zinc-200 rounded-full dark:bg-zinc-700 w-40"></div>
+        <div className="h-2.5 ms-2 bg-zinc-300 rounded-full dark:bg-zinc-600 w-24"></div>
+        <div className="h-2.5 ms-2 bg-zinc-300 rounded-full dark:bg-zinc-600 w-full"></div>
       </div>
       <div className="flex items-center w-full ">
-        <div className="h-2.5 bg-gray-200 rounded-full dark:bg-gray-700 w-full"></div>
-        <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
-        <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-24"></div>
+        <div className="h-2.5 bg-zinc-200 rounded-full dark:bg-zinc-700 w-full"></div>
+        <div className="h-2.5 ms-2 bg-zinc-300 rounded-full dark:bg-zinc-600 w-full"></div>
+        <div className="h-2.5 ms-2 bg-zinc-300 rounded-full dark:bg-zinc-600 w-24"></div>
       </div>
       <div className="flex items-center w-full max-md:hidden">
-        <div className="h-2.5 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
-        <div className="h-2.5 ms-2 bg-gray-200 rounded-full dark:bg-gray-700 w-80"></div>
-        <div className="h-2.5 ms-2 bg-gray-300 rounded-full dark:bg-gray-600 w-full"></div>
+        <div className="h-2.5 bg-zinc-300 rounded-full dark:bg-zinc-600 w-full"></div>
+        <div className="h-2.5 ms-2 bg-zinc-200 rounded-full dark:bg-zinc-700 w-80"></div>
+        <div className="h-2.5 ms-2 bg-zinc-300 rounded-full dark:bg-zinc-600 w-full"></div>
       </div>
     </div>
   );
 
   const ToolMessageLoader = () => (
-    <div className="mt-1 flex items-center space-x-3 p-3 rounded-lg bg-gray-50 dark:bg-[#2f2f2f] w-fit">
+    <div className="mt-1 flex items-center space-x-3 p-3 rounded-lg bg-zinc-50 dark:bg-[#2f2f2f] w-fit">
       <Loader2 className="h-4 w-4 animate-spin" />
       <div className="text-sm">
         {toolMessage}
@@ -483,7 +483,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           disabled={!hasPrev}
           className={`p-1 rounded transition-colors ${hasPrev
             ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
-            : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+            : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
             }`}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -496,7 +496,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           disabled={!hasNext}
           className={`p-1 rounded transition-colors ${hasNext
             ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
-            : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+            : 'text-zinc-300 dark:text-zinc-600 cursor-not-allowed'
             }`}
         >
           <ChevronRight className="h-4 w-4" />
