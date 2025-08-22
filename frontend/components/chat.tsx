@@ -13,13 +13,14 @@ import { CodeBlock, generateRandomString } from './ui/codeblock';
 import { MemoizedReactMarkdown } from './markdown';
 import LoadingSpinner from './ui/loading-spinner';
 import { ButtonScrollToBottom } from './ui/button-scroll-to-bottom';
+import { Button } from './ui/button';
 import 'katex/dist/katex.min.css';
 import rehypeKatex from 'rehype-katex';
 import { BlockMath } from 'react-katex';
 import { useToast } from './ui/use-toast';
 import { authenticateUser } from '@/lib/utils';
 import { MessageActions } from './message-actions';
-import { Loader2 } from 'lucide-react';
+import { Loader2, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import DocumentManager from './document-manager';
 
@@ -39,6 +40,18 @@ interface Message {
   role: string;
   text: string;
   isPlaceholder?: boolean;
+}
+
+interface ConversationBranch {
+  messages: Array<{
+    type: string;
+    content: string;
+  }>;
+}
+
+interface ConversationData {
+  main: ConversationBranch;
+  [key: string]: ConversationBranch; // For other branches like "random"
 }
 
 interface Document {
@@ -65,6 +78,13 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
 
   // Add hover state for message actions
   const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null);
+  const [currentBranch, setCurrentBranch] = useState<string>('main');
+  const [conversationData, setConversationData] = useState<ConversationData | null>(null);
+  const [availableBranches, setAvailableBranches] = useState<string[]>(['main']);
+
+  // Add edit state
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+  const [editingMessageContent, setEditingMessageContent] = useState<string>('');
 
   const scrollToBottom = useCallback((instant = false, isUser = false) => {
     if (isUser) {
@@ -134,7 +154,9 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         body: JSON.stringify({
           model_id: chatService.selectedModelId$.value,
           user_input: text,
-          chat_id: currentChatId || uploadChatId
+          chat_id: currentChatId || uploadChatId,
+          branch: currentBranch,
+          temperature: parseFloat(window.localStorage.getItem('responseType') || "0.5")
         })
       });
       if (!response.ok) {
@@ -149,7 +171,9 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
             body: JSON.stringify({
               modelId: chatService.selectedModelId$.value,
               userInput: text,
-              chatId: currentChatId || uploadChatId
+              chatId: currentChatId || uploadChatId,
+              branch: currentBranch,
+              temperature: parseFloat(window.localStorage.getItem('responseType') || "0.5")
             })
           });
         } else {
@@ -235,6 +259,148 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
     return chatId;
   };
 
+  const handleEditMessage = (index: number, content: string) => {
+    setEditingMessageIndex(index);
+    setEditingMessageContent(content);
+  };
+
+  const handleEditSubmit = async (newContent: string) => {
+    if (editingMessageIndex === null || !currentChatId) return;
+
+    try {
+
+      // Update the message content
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        newMessages[editingMessageIndex] = {
+          role: 'user',
+          text: newContent
+        };
+        // Clear all messages after the edited one (AI responses)
+        return newMessages.slice(0, editingMessageIndex + 1);
+      });
+
+      setAssistantTyping(true);
+
+      // Call the new edit_message API
+      var response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/edit_message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          "Authorization": `Bearer ${back_auth}`
+        },
+        body: JSON.stringify({
+          model_id: chatService.selectedModelId$.value,
+          parent_branch: currentBranch,
+          edit_index: editingMessageIndex,
+          new_message: newContent,
+          chat_id: currentChatId,
+          temperature: parseFloat(window.localStorage.getItem('responseType') || "0.5")
+        })
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          const newToken = await getuId_token();
+          response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/chat/edit_message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              "Authorization": `Bearer ${newToken}`
+            },
+            body: JSON.stringify({
+              model_id: chatService.selectedModelId$.value,
+              parent_branch: currentBranch,
+              edit_index: editingMessageIndex,
+              new_message: newContent,
+              chat_id: currentChatId,
+              temperature: parseFloat(window.localStorage.getItem('responseType') || "0.5")
+            })
+          });
+        } else {
+          throw new Error(`There was a problem with your edit. Status: ${response.status} : ${await response.text().then(t => t.split('\n')[0])}`);
+        }
+      }
+
+      const responseJson = await response.json();
+      if (responseJson.success) {
+
+        // Clear the editing state immediately
+        setEditingMessageIndex(null);
+        setEditingMessageContent('');
+        // Refresh conversation data to get the new branch and updated message content
+        await refreshConversationData();
+
+        toast({
+          variant: "default",
+          title: "Message edited successfully",
+          description: "A new branch has been created with your edited message.",
+          duration: 3000
+        });
+      } else {
+        const errorMessage = responseJson.error_message;
+        toast({
+          variant: "destructive",
+          title: "Edit failed",
+          description: errorMessage,
+          duration: 3000
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Edit failed",
+        description: "Failed to edit message. Error: " + error as string,
+        duration: 3000
+      });
+    } finally {
+      setAssistantTyping(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingMessageIndex(null);
+    setEditingMessageContent('');
+  };
+
+  const refreshConversationData = async () => {
+    if (!currentChatId) return;
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/conversations/${currentChatId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${back_auth}`
+        },
+      });
+
+      if (response.status === 401) {
+        await getuId_token();
+        return refreshConversationData(); // Retry after token refresh
+      }
+
+      const data = await response.json();
+      const conversation = data?.conversation || {};
+      const tokensConsumed = data?.tokensConsumed || 0;
+      setDocuments(data?.files || []);
+
+      // Store the full conversation data with all branches
+      setConversationData(conversation);
+
+      // Get available branches
+      const branches = Object.keys(conversation);
+      setAvailableBranches(branches);
+
+      // Switch to the new branch that was just created (assuming it's the last one)
+      if (branches.length > 1) {
+        const newBranch = branches[branches.length - 1]; // Usually the newly created branch
+        setCurrentBranch(newBranch);
+      }
+    } catch (error) {
+      console.error("Error refreshing conversation data:", error);
+    }
+  };
+
   const handleFileDelete = async (docIdList: string[]) => {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/document/delete_file`, {
@@ -296,6 +462,24 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
     </div>
   );
 
+  const BranchIndicator = ({ index }: { index: number }) => {
+    const branchPoints = getBranchPoints();
+    if (!branchPoints.includes(index) || availableBranches.length <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-center my-2">
+        <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
+          <ChevronLeft className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+          <GitBranch className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+            Branch point
+          </span>
+          <ChevronRight className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+        </div>
+      </div>
+    );
+  };
+
   const handleNewChat = () => {
     setMessages([]);
     setIsAtBottom(true);
@@ -311,7 +495,59 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
       window.history.pushState({}, '', `/c/${iD}`);
       setCurrentChatId(iD);
       setAssistantTyping(false);
+      setCurrentBranch('main'); // Reset to main branch when switching chats
     }
+  };
+
+  const switchBranch = (branchName: string) => {
+    if (!conversationData || !conversationData[branchName]) return;
+
+    setCurrentBranch(branchName);
+    const rawMessages = conversationData[branchName].messages;
+
+    const newMessages: Message[] = rawMessages
+      .filter((message: any) => {
+        return (
+          (message.type === "human" || message.type === "AIMessageChunk") &&
+          message.content?.trim() !== ""
+        );
+      })
+      .map((message: any) => ({
+        role: message.type === "human" ? "user" : "assistant",
+        text: message.content,
+      }));
+
+    setMessages(newMessages);
+    setTimeout(() => scrollToBottom(true), 50);
+  };
+
+  const getBranchPoints = (): number[] => {
+    if (!conversationData || availableBranches.length <= 1) return [];
+
+    const branchPoints: number[] = [];
+    const mainMessages = conversationData.main?.messages || [];
+
+    // Check each branch against main to find divergence points
+    for (const branch of availableBranches) {
+      if (branch === 'main') continue;
+
+      const branchMessages = conversationData[branch]?.messages || [];
+      let divergenceIndex = -1;
+
+      // Find the first point where messages differ
+      for (let i = 0; i < Math.min(mainMessages.length, branchMessages.length); i++) {
+        if (mainMessages[i].content !== branchMessages[i].content) {
+          divergenceIndex = i;
+          break;
+        }
+      }
+
+      if (divergenceIndex >= 0) {
+        branchPoints.push(divergenceIndex);
+      }
+    }
+
+    return [...new Set(branchPoints)]; // Remove duplicates
   };
 
   useEffect(() => {
@@ -328,9 +564,19 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           .then((response) =>
             response.status === 401 ? getuId_token().then(() => window.location.reload()) : response.json())
           .then((data) => {
-            const rawMessages = data?.conversation?.main?.messages || [];
+            const conversation = data?.conversation || {};
             const tokensConsumed = data?.tokensConsumed || 0;
             setDocuments(data?.files || []);
+
+            // Store the full conversation data with all branches
+            setConversationData(conversation);
+
+            // Get available branches
+            const branches = Object.keys(conversation);
+            setAvailableBranches(branches);
+
+            // Load messages from current branch
+            const rawMessages = conversation[currentBranch]?.messages || [];
             if (rawMessages.length > 0) {
               const newMessages: Message[] = rawMessages
                 .filter((message: any) => {
@@ -538,6 +784,55 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                   />
                 )}
               </div>
+
+              {/* Branch Navigation */}
+              {availableBranches.length > 1 && (
+                <div className="flex items-center justify-center py-2 px-4 border-b bg-gray-50 dark:bg-gray-800">
+                  <div className="flex items-center gap-2">
+                    <GitBranch className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Branch:</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          const currentIndex = availableBranches.indexOf(currentBranch);
+                          const prevIndex = currentIndex > 0 ? currentIndex - 1 : availableBranches.length - 1;
+                          switchBranch(availableBranches[prevIndex]);
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <span className="text-sm font-medium bg-white dark:bg-gray-700 px-3 py-1 rounded border">
+                        {currentBranch}
+                      </span>
+                      <button
+                        onClick={() => {
+                          const currentIndex = availableBranches.indexOf(currentBranch);
+                          const nextIndex = currentIndex < availableBranches.length - 1 ? currentIndex + 1 : 0;
+                          switchBranch(availableBranches[nextIndex]);
+                        }}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      {availableBranches.map((branch) => (
+                        <button
+                          key={branch}
+                          onClick={() => switchBranch(branch)}
+                          className={`text-xs px-2 py-1 rounded transition-colors ${branch === currentBranch
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                            }`}
+                        >
+                          {branch}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className='flex h-full overflow-y-auto'>
                 <div
                   ref={chatContainerRef}
@@ -548,122 +843,164 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                     <div className="translateZ(0px)">
                       {(messages.length > 0) &&
                         (messages.map((message, index) => (
-                          <div key={index} className={`px-4 py-2 w-full justify-center text-base md:gap-6 md:mb-6 `}>
-                            <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-2xl xl:max-w-[48rem] group'>
-                              <div className="hidden flex-shrink-0 md:flex flex-col relative items-end">
-                                <div>
-                                  <div className="pt-0.5">
-                                    {message.role === 'user' ?
-                                      (
-                                        <Avatar className="h-6 w-6 rounded-full">
-                                          <AvatarImage src={uImg} alt={fName} />
-                                          <AvatarFallback className="rounded-full">{fName[0]}{lName[0]}</AvatarFallback>
-                                        </Avatar>
-                                      )
-                                      : (
-                                        <Avatar className="h-6 w-6 rounded-full">
-                                          <AvatarImage src="/icon.svg" alt="Eva" />
-                                          <AvatarFallback className="rounded-full">Eva</AvatarFallback>
-                                        </Avatar>
-                                      )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div
-                                className='relative overflow-hidden flex w-full flex-col'
-                                onPointerEnter={() => message.role === 'user' && setHoveredMessageIndex(index)} //support hover for both mouse and touch inputs
-                                onMouseLeave={() => message.role === 'user' && setHoveredMessageIndex(null)}
-                              >
-                                <div className="hidden md:inline-block font-bold select-none capitalize">
-                                  {message.role === 'user' ? (fName) : ('Eva')}
-                                </div>
-                                <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
-                                  <div className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user' ? 'bg-[#f9f9f9] dark:bg-[#2f2f2f] dark:text-white rounded-md px-5 py-1.5 w-fit' : ''}`}>
-                                    {message.isPlaceholder ?
-                                      (toolMessage.length > 0 ? <ToolMessageLoader /> : <SkeletonLoader />)
-                                      : (
-                                        message.role === 'assistant' ? (<MemoizedReactMarkdown
-                                          className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base" //pl-4
-                                          remarkPlugins={[remarkGfm, remarkMath]}
-                                          rehypePlugins={[rehypeKatex]}
-                                          components={{
-                                            p({ children }) {
-                                              return <p className="mb-2 last:mb-0">{children}</p>
-                                            },
-                                            a({ node, children, href, ...props }) {
-                                              const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
-                                              return (
-                                                <a
-                                                  {...props}
-                                                  href={href}
-                                                  target={isExternal ? "_blank" : undefined}
-                                                  rel={isExternal ? "noopener noreferrer" : undefined}
-                                                >
-                                                  {children}
-                                                </a>
-                                              );
-                                            },
-                                            code({ node, className, children, ...props }) {
-                                              if (className?.startsWith('math')) {
-                                                return <BlockMath math={String(children)} />
-                                              }
-                                              if (className === 'language-math') {
-                                                return <BlockMath math={String(children).replace(/\n$/, '')} />
-                                              }
-                                              const match = /language-(\w+)/.exec(className || '')
-                                              return match ? (
-                                                <CodeBlock
-                                                  key={Math.random()}
-                                                  language={(match && match[1]) || ''}
-                                                  value={String(children).replace(/\n$/, '')}
-                                                  {...props}
-                                                />
-                                              ) : (
-                                                <code className={className} {...props}>
-                                                  {children}
-                                                </code>
-                                              )
-                                            }
-                                          }}
-                                        >
-                                          {message.text}
-                                        </MemoizedReactMarkdown>
-                                        ) : (
-                                          <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
+                          <React.Fragment key={index}>
+                            <div className={`px-4 py-2 w-full justify-center text-base md:gap-6 md:mb-6 `}>
+                              <div className='flex flex-1 w-full text-base mx-auto gap-3 md:max-w-3xl lg:max-w-2xl xl:max-w-[48rem] group'>
+                                <div className="hidden flex-shrink-0 md:flex flex-col relative items-end">
+                                  <div>
+                                    <div className="pt-0.5">
+                                      {message.role === 'user' ?
+                                        (
+                                          <Avatar className="h-6 w-6 rounded-full">
+                                            <AvatarImage src={uImg} alt={fName} />
+                                            <AvatarFallback className="rounded-full">{fName[0]}{lName[0]}</AvatarFallback>
+                                          </Avatar>
                                         )
-                                      )}
+                                        : (
+                                          <Avatar className="h-6 w-6 rounded-full">
+                                            <AvatarImage src="/icon.svg" alt="Eva" />
+                                            <AvatarFallback className="rounded-full">Eva</AvatarFallback>
+                                          </Avatar>
+                                        )}
+                                    </div>
                                   </div>
                                 </div>
-                                {/* MessageActions with conditional visibility */}
-                                {message.role === 'user' ? (
-                                  // Show only on hover for user messages
-                                  hoveredMessageIndex === index ?
+                                <div
+                                  className='relative overflow-hidden flex w-full flex-col'
+                                  onPointerEnter={() => message.role === 'user' && setHoveredMessageIndex(index)} //support hover for both mouse and touch inputs
+                                  onMouseLeave={() => message.role === 'user' && setHoveredMessageIndex(null)}
+                                >
+                                  <div className="hidden md:inline-block font-bold select-none capitalize">
+                                    {message.role === 'user' ? (fName) : ('Eva')}
+                                  </div>
+                                  <div className={`flex ${message.role === 'user' ? 'place-content-end' : ''}`}>
+                                    <div
+                                      className={`min-h-[20px] z-10 flex flex-col mt-1 overflow-x-auto ${message.role === 'user'
+                                        ? editingMessageIndex === index
+                                          ? 'bg-[#f9f9f9] dark:bg-[#2f2f2f] rounded-md px-5 py-1.5 w-full'
+                                          : 'bg-[#f9f9f9] dark:bg-[#2f2f2f] rounded-md px-5 py-1.5 w-fit'
+                                        : ''}`}
+                                    >
+
+                                      {message.isPlaceholder ?
+                                        (toolMessage.length > 0 ? <ToolMessageLoader /> : <SkeletonLoader />)
+                                        : (
+                                          editingMessageIndex === index && message.role === 'user' ? (
+                                            // Edit input field for user messages
+                                            <div className="flex flex-col gap-3 w-full">
+                                              <textarea
+                                                value={editingMessageContent}
+                                                onChange={(e) => setEditingMessageContent(e.target.value)}
+                                                className="w-full p-3 resize-none rounded-lg bg-transparent text-base focus:outline-none focus:ring-0"
+                                                rows={4}
+                                                autoFocus
+                                                placeholder="Edit your message..."
+                                                style={{ maxHeight: '240px', overflowY: 'auto' }}
+                                              />
+                                              <div className="flex gap-2 justify-end">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={handleEditCancel}
+                                                  disabled={isAssistantTyping}
+                                                >
+                                                  Cancel
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() => handleEditSubmit(editingMessageContent)}
+                                                  disabled={isAssistantTyping || !editingMessageContent.trim()}
+                                                >
+                                                  Send
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ) : message.role === 'assistant' ? (<MemoizedReactMarkdown
+                                            className="prose break-words dark:prose-invert prose-p:leading-relaxed prose-pre:p-0 dark:text-white text-base" //pl-4
+                                            remarkPlugins={[remarkGfm, remarkMath]}
+                                            rehypePlugins={[rehypeKatex]}
+                                            components={{
+                                              p({ children }) {
+                                                return <p className="mb-2 last:mb-0">{children}</p>
+                                              },
+                                              a({ node, children, href, ...props }) {
+                                                const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
+                                                return (
+                                                  <a
+                                                    {...props}
+                                                    href={href}
+                                                    target={isExternal ? "_blank" : undefined}
+                                                    rel={isExternal ? "noopener noreferrer" : undefined}
+                                                  >
+                                                    {children}
+                                                  </a>
+                                                );
+                                              },
+                                              code({ node, className, children, ...props }) {
+                                                if (className?.startsWith('math')) {
+                                                  return <BlockMath math={String(children)} />
+                                                }
+                                                if (className === 'language-math') {
+                                                  return <BlockMath math={String(children).replace(/\n$/, '')} />
+                                                }
+                                                const match = /language-(\w+)/.exec(className || '')
+                                                return match ? (
+                                                  <CodeBlock
+                                                    key={Math.random()}
+                                                    language={(match && match[1]) || ''}
+                                                    value={String(children).replace(/\n$/, '')}
+                                                    {...props}
+                                                  />
+                                                ) : (
+                                                  <code className={className} {...props}>
+                                                    {children}
+                                                  </code>
+                                                )
+                                              }
+                                            }}
+                                          >
+                                            {message.text}
+                                          </MemoizedReactMarkdown>
+                                          ) : (
+                                            <div className="text-left whitespace-pre-wrap text-base">{message.text}</div>
+                                          )
+                                        )}
+                                    </div>
+                                  </div>
+                                  {/* MessageActions with conditional visibility */}
+                                  {message.role === 'user' ? (
+                                    // Show only on hover for user messages
+                                    hoveredMessageIndex === index ?
+                                      <MessageActions
+                                        role={message.role}
+                                        content={message.text}
+                                        conversationId={currentChatId}
+                                        index={index}
+                                        onEdit={handleEditMessage}
+                                        className="chat-title-enter-active"
+                                      /> : <MessageActions
+                                        role={message.role}
+                                        content={message.text}
+                                        conversationId={currentChatId}
+                                        index={index}
+                                        onEdit={handleEditMessage}
+                                        className="chat-title-exit-active"
+                                      />
+                                  ) : (
+                                    // Always show for assistant messages
                                     <MessageActions
                                       role={message.role}
                                       content={message.text}
                                       conversationId={currentChatId}
                                       index={index}
-                                      className="chat-title-enter-active"
-                                    /> : <MessageActions
-                                      role={message.role}
-                                      content={message.text}
-                                      conversationId={currentChatId}
-                                      index={index}
-                                      className="chat-title-exit-active"
+                                      className={isAssistantTyping && message.role === 'assistant' && index === messages.length - 1 ? 'hidden' : ''}
                                     />
-                                ) : (
-                                  // Always show for assistant messages
-                                  <MessageActions
-                                    role={message.role}
-                                    content={message.text}
-                                    conversationId={currentChatId}
-                                    index={index}
-                                    className={isAssistantTyping && message.role === 'assistant' && index === messages.length - 1 ? 'hidden' : ''}
-                                  />
-                                )}
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
+                            <BranchIndicator index={index} />
+                          </React.Fragment>
                         ))
                         )}
                       <div ref={messagesEndRef} />

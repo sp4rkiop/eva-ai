@@ -252,7 +252,7 @@ const Input: React.FC<InputProps> = ({ isActive, onSubmit, messagesLength, showS
                                 onBlur={() => setIsTyping(text.trim().length > 0)}
                                 onKeyDown={handleKeyDown}
                                 disabled={isActive}
-                                className={`w-full resize-none outline-none py-2 bg-transparent dark:bg-transparent placeholder-black/60 dark:placeholder-white/60 text-base ${isActive && 'opacity-50 cursor-wait'}`}
+                                className={`w-full resize-none outline-none py-2 bg-transparent placeholder-black/60 dark:placeholder-white/60 text-base ${isActive && 'opacity-50 cursor-wait'}`}
                                 style={{ maxHeight: '240px', overflowY: 'auto' }}
                             />
                         </div>

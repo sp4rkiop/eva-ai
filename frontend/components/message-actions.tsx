@@ -1,7 +1,7 @@
 // components/message-actions.tsx
 import { Button } from './ui/button';
 import { useCopyToClipboard } from '@/lib/hooks/use-copy-to-clipboard';
-import { CheckCircleIcon, Copy, RefreshCw, RefreshCwOff, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { CheckCircleIcon, Copy, RefreshCw, RefreshCwOff, ThumbsDown, ThumbsUp, Pencil } from 'lucide-react';
 import { useState } from 'react';
 
 interface MessageActionsProps {
@@ -9,6 +9,7 @@ interface MessageActionsProps {
   content: string;
   conversationId: string | undefined;
   index: number;
+  onEdit?: (index: number, content: string) => void;
 }
 
 // Dummy API call function
@@ -64,7 +65,7 @@ const regenerateResponse = async (conversationId: string, index: number) => {
   return { success: true }; // Simulate successful response
 };
 
-export const MessageActions = ({ role, content, conversationId, index, className }: MessageActionsProps & { className?: string }) => {
+export const MessageActions = ({ role, content, conversationId, index, onEdit, className }: MessageActionsProps & { className?: string }) => {
   const { isCopied, copyToClipboard } = useCopyToClipboard({ timeout: 2000 });
   const [userRating, setUserRating] = useState<'like' | 'dislike' | null>(null);
   const [isRating, setIsRating] = useState(false);
@@ -75,9 +76,15 @@ export const MessageActions = ({ role, content, conversationId, index, className
     copyToClipboard(content);
   };
 
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(index, content);
+    }
+  };
+
   const handleRate = async (rating: 'like' | 'dislike') => {
     if (isRating || userRating) return;
-    
+
     setIsRating(true);
     try {
       await rateResponse(conversationId!, index, rating);
@@ -102,23 +109,32 @@ export const MessageActions = ({ role, content, conversationId, index, className
   };
   return (
     <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} gap-1 mt-1 text-zinc-600 dark:text-zinc-100 ${className}`}>
+      {role === 'user' && onEdit && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]"
+          onClick={handleEdit}
+        >
+          <Pencil />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="sm"
         className="h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]"
         onClick={onCopy}
       >
-        {isCopied ? <CheckCircleIcon/> : <Copy/>}
+        {isCopied ? <CheckCircleIcon /> : <Copy />}
       </Button>
-      
+
       {/* Thumbs Up Button - only shown for assistant messages */}
       {role !== 'user' && (
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f] ${
-            userRating === 'dislike' ? 'hidden' : ''
-          }`}
+          className={`h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f] ${userRating === 'dislike' ? 'hidden' : ''
+            }`}
           onClick={() => handleRate('like')}
           disabled={isRating}
         >
@@ -129,15 +145,14 @@ export const MessageActions = ({ role, content, conversationId, index, className
           )}
         </Button>
       )}
-      
+
       {/* Thumbs Down Button - only shown for assistant messages */}
       {role !== 'user' && (
         <Button
           variant="ghost"
           size="sm"
-          className={`h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f] ${
-            userRating === 'like' ? 'hidden' : ''
-          }`}
+          className={`h-6 w-6 p-0 hover:bg-zinc-200 dark:hover:bg-[#2f2f2f] ${userRating === 'like' ? 'hidden' : ''
+            }`}
           onClick={() => handleRate('dislike')}
           disabled={isRating}
         >

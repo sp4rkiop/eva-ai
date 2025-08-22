@@ -460,7 +460,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                             <ContextMenu>
                               <ContextMenuTrigger className={`group flex items-center h-8 rounded-md px-2 hover-light-dark ${chatTitle.id == chatId ? 'skeleton' : ''}`}>
                                 <button
-                                  className={`w-full h-full text-left group-hover:text-gray-950 dark:group-hover:text-gray-200 truncate hover:text-clip`}
+                                  className={`w-full h-full text-left truncate hover:text-clip`}
                                   onClick={(e) => {
                                     e.preventDefault();
                                     onOldChatClick(chatTitle.id);

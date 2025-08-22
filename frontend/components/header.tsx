@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Slider } from "@/components/ui/slider"
 import { useToast } from './ui/use-toast';
 interface Model {
   id: number;
@@ -25,16 +26,17 @@ interface HeaderProps {
   back_auth: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, back_auth}) => {
+const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, back_auth }) => {
   const { toggleChatHistoryVisibility } = useVisibility();
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [responseType, setResponseType] = useState<number>(0.5);
   const fetchedRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
     const getModels = async (back_auth?: string): Promise<void> => {
-      try{
+      try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/api/v1/user/models`, {
           method: "GET",
           headers: {
@@ -53,7 +55,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
           return getModels(back_auth);
         }
         const data = await response.text();
-        if(data!=null && data.length!= 0) {
+        if (data != null && data.length != 0) {
           const models = JSON.parse(data);
           models.forEach((model: Model) => model.lastSelected = false);
           setModels(models);
@@ -62,7 +64,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
           service.selectedModelId$.next(models[0].id);
         }
       }
-      catch(error) {
+      catch (error) {
         toast({
           variant: "destructive",
           title: "Uh oh! Something went wrong.",
@@ -74,7 +76,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
     };
     // Load models from session storage if available
     const savedModels = window.localStorage.getItem('models');
-    if (savedModels!==null) {
+    if (savedModels !== null) {
       const parsedModels = JSON.parse(savedModels);
       setModels(parsedModels);
       if (parsedModels.length > 0) {
@@ -89,12 +91,21 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
         }
       }
     }
+
+    // Load response type from local storage
+    const savedResponseType = window.localStorage.getItem('responseType');
+    if (savedResponseType !== null) {
+      const parsedResponseType = parseFloat(savedResponseType);
+      if (!isNaN(parsedResponseType) && parsedResponseType >= 0 && parsedResponseType <= 1) {
+        setResponseType(parsedResponseType);
+      }
+    }
     else if (!fetchedRef.current) {
       getModels(back_auth);
       fetchedRef.current = true;
-  }
+    }
   }, []);
-  
+
 
   const handleModelChange = (modelName: string, id: number, lastSelected: boolean) => {
     setSelectedModel(modelName);
@@ -111,9 +122,24 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
       }
     }
   };
-  
+
+  const handleResponseTypeChange = (value: number[]) => {
+    const newValue = value[0];
+    setResponseType(newValue);
+    window.localStorage.setItem('responseType', newValue.toString());
+    // You can also emit this to the service if needed for backend communication
+    // service.responseType$.next(newValue);
+  };
+
+  const getResponseTypeLabel = (value: number): string => {
+    if (value === 0) return 'Strict';
+    if (value === 0.5) return 'Neutral';
+    if (value === 1) return 'Creative';
+    return 'Neutral';
+  };
+
   return (
-    <div className="text-token-primary sticky top-0 z-10 flex flex-grow items-center justify-center md:justify-start min-h-[40px] md:min-h-[60px] pl-1">
+    <div className="text-token-primary sticky top-0 z-10 flex flex-grow items-center justify-center md:place-content-between min-h-[40px] md:min-h-[60px] pl-1">
       <button type="button" className="md:hidden absolute bottom-0 left-0 top-0 inline-flex items-center rounded-md px-3 hover-light-dark dark:hover:bg-neutral-950 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white active:opacity-50" onClick={toggleChatHistoryVisibility}>
         <span className="sr-only">Open sidebar</span>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -123,33 +149,53 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
       <div className="flex cursor-pointer gap-1 rounded-md hover-light-dark dark:hover:bg-neutral-950">
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
-              {selectedModel || 'Default Model'}
-              <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
+            {selectedModel || 'Default Model'}
+            <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuLabel>Models</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            
-              {models.length <= 0 ? (
-                  <DropdownMenuItem className="animate-pulse">
-                      <div className="skeleton">Finding</div>
-                  </DropdownMenuItem>
-              ):(
-                  models.map((model) => (
-                  <DropdownMenuItem
-                    key={model.id}
-                    onClick={() => handleModelChange(model.name, model.id, true)}
-                    className="uppercase"
-                  >
-                    {model.name}
-                  </DropdownMenuItem>
-                ))
-              )}
+
+            {models.length <= 0 ? (
+              <DropdownMenuItem className="animate-pulse">
+                <div className="skeleton">Finding</div>
+              </DropdownMenuItem>
+            ) : (
+              models.map((model) => (
+                <DropdownMenuItem
+                  key={model.id}
+                  onClick={() => handleModelChange(model.name, model.id, true)}
+                  className="uppercase"
+                >
+                  {model.name}
+                </DropdownMenuItem>
+              ))
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <div className="flex items-center gap-1 mr-2">
+        <div className="flex flex-row items-center gap-2">
+          <span className="hidden md:block text-xs text-gray-600 dark:text-zinc-200 uppercase">
+            Response Type
+          </span>
+          <div className="flex items-center gap-2">
+            <Slider
+              value={[responseType]}
+              onValueChange={handleResponseTypeChange}
+              max={1}
+              min={0}
+              step={0.5}
+              className="w-20 sm:w-24"
+            />
+            <span className="text-sm font-medium min-w-[50px] text-center">
+              {getResponseTypeLabel(responseType)}
+            </span>
+          </div>
+        </div>
+      </div>
       <div className="md:hidden absolute bottom-0 right-0 top-0 flex">
-        <button type="button" className="px-3" onClick={(e) => {e.preventDefault(); onNewChatClick();}}>
+        <button type="button" className="px-3" onClick={(e) => { e.preventDefault(); onNewChatClick(); }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path fillRule="evenodd" clipRule="evenodd" d="M16.7929 2.79289C18.0118 1.57394 19.9882 1.57394 21.2071 2.79289C22.4261 4.01184 22.4261 5.98815 21.2071 7.20711L12.7071 15.7071C12.5196 15.8946 12.2652 16 12 16H9C8.44772 16 8 15.5523 8 15V12C8 11.7348 8.10536 11.4804 8.29289 11.2929L16.7929 2.79289ZM19.7929 4.20711C19.355 3.7692 18.645 3.7692 18.2071 4.2071L10 12.4142V14H11.5858L19.7929 5.79289C20.2308 5.35499 20.2308 4.64501 19.7929 4.20711ZM6 5C5.44772 5 5 5.44771 5 6V18C5 18.5523 5.44772 19 6 19H18C18.5523 19 19 18.5523 19 18V14C19 13.4477 19.4477 13 20 13C20.5523 13 21 13.4477 21 14V18C21 19.6569 19.6569 21 18 21H6C4.34315 21 3 19.6569 3 18V6C3 4.34314 4.34315 3 6 3H10C10.5523 3 11 3.44771 11 4C11 4.55228 10.5523 5 10 5H6Z" fill="currentColor"></path>
           </svg>
