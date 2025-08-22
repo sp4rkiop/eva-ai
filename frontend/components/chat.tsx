@@ -463,19 +463,23 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
   );
 
   const BranchIndicator = ({ index, className }: { index: number; className?: string }) => {
-    const branchPoints = getBranchPoints();
-    if (!branchPoints.includes(index) || availableBranches.length <= 1) return null;
 
-    const currentIndex = availableBranches.indexOf(currentBranch);
-    const totalBranches = availableBranches.length;
+    // Get branches that diverge at this specific index
+    const relevantBranches = getRelevantBranchesForIndex(index);
+
+    // Don't show indicator if current branch is not in the relevant branches for this index
+    if (!relevantBranches.includes(currentBranch)) return null;
+
+    const currentIndex = relevantBranches.indexOf(currentBranch);
+    const totalBranches = relevantBranches.length;
     const currentDisplay = currentIndex + 1; // 1-based indexing for display
     const hasPrev = currentIndex > 0;
-    const hasNext = currentIndex < availableBranches.length - 1;
+    const hasNext = currentIndex < relevantBranches.length - 1;
 
     return (
       <div className={`flex items-center mt-1 ${className || ''}`}>
         <button
-          onClick={() => hasPrev && switchBranch(availableBranches[currentIndex - 1])}
+          onClick={() => hasPrev && switchBranch(relevantBranches[currentIndex - 1])}
           disabled={!hasPrev}
           className={`p-1 rounded transition-colors ${hasPrev
             ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
@@ -488,7 +492,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
           {currentDisplay} / {totalBranches}
         </span>
         <button
-          onClick={() => hasNext && switchBranch(availableBranches[currentIndex + 1])}
+          onClick={() => hasNext && switchBranch(relevantBranches[currentIndex + 1])}
           disabled={!hasNext}
           className={`p-1 rounded transition-colors ${hasNext
             ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
@@ -516,7 +520,7 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
       window.history.pushState({}, '', `/c/${iD}`);
       setCurrentChatId(iD);
       setAssistantTyping(false);
-      setCurrentBranch('main'); // Reset to main branch when switching chats
+      // setCurrentBranch('main'); // Reset to main branch when switching chats
     }
   };
 
@@ -542,13 +546,13 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
     setTimeout(() => scrollToBottom(true), 50);
   };
 
-  const getBranchPoints = (): number[] => {
+  const getRelevantBranchesForIndex = (targetIndex: number): string[] => {
     if (!conversationData || availableBranches.length <= 1) return [];
 
-    const branchPoints: number[] = [];
+    const relevantBranches: string[] = ['main'];
     const mainMessages = conversationData.main?.messages || [];
 
-    // Check each branch against main to find divergence points
+    // Find branches that diverge at this specific index
     for (const branch of availableBranches) {
       if (branch === 'main') continue;
 
@@ -563,12 +567,14 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
         }
       }
 
-      if (divergenceIndex >= 0) {
-        branchPoints.push(divergenceIndex);
+      // Include this branch if it diverges at the target index
+      if (divergenceIndex === targetIndex) {
+        relevantBranches.push(branch);
       }
     }
 
-    return [...new Set(branchPoints)]; // Remove duplicates
+    // Only return relevant branches if there are actually multiple branches diverging at this index
+    return relevantBranches.length > 1 ? relevantBranches : [];
   };
 
   useEffect(() => {
@@ -595,9 +601,11 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
             // Get available branches
             const branches = Object.keys(conversation);
             setAvailableBranches(branches);
+            const lastBranch = branches[branches.length - 1];
+            setCurrentBranch(lastBranch);
 
             // Load messages from current branch
-            const rawMessages = conversation[currentBranch]?.messages || [];
+            const rawMessages = conversation[lastBranch]?.messages || [];
             if (rawMessages.length > 0) {
               const newMessages: Message[] = rawMessages
                 .filter((message: any) => {
