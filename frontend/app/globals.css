@@ -73,16 +73,18 @@
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
 
-:root{
+:root {
   --white: #fff;
   --black: #000;
   --gray-50: #f9f9f9;
@@ -101,6 +103,7 @@
   --red-700: #b91c1c;
   --brand-purple: #ab68ff;
 }
+
 .btn {
   align-items: center;
   border-color: transparent;
@@ -113,10 +116,11 @@
   padding: .5rem .75rem;
   pointer-events: auto;
 }
+
 .btn-neutral {
   background-color: #fff;
   background-color: var(--main-surface-primary);
-  border-color: rgba(0,0,0,.15);
+  border-color: rgba(0, 0, 0, .15);
   border-color: var(--gray-600);
   border-width: 1px;
   color: #0d0d0d;
@@ -124,40 +128,49 @@
   font-size: .875rem;
   line-height: 1.35rem;
 }
+
 .icon-md {
   stroke-width: 1.5;
 }
+
 .text-white {
   --tw-text-opacity: 1;
-  color: rgba(255,255,255,var(--tw-text-opacity));
+  color: rgba(255, 255, 255, var(--tw-text-opacity));
 }
+
 .isVisible {
   display: none;
 }
+
 .adptView {
   flex-shrink: 0;
   overflow-x: hidden;
   z-index: 50;
   width: 260px;
 }
+
 .chat-title-enter {
   opacity: 0;
   transform: translateY(-20px);
 }
+
 .chat-title-enter-active {
   opacity: 1;
   transform: translateY(0);
   transition: opacity 500ms, transform 500ms;
 }
+
 .chat-title-exit {
   opacity: 1;
   transform: translateY(0);
 }
+
 .chat-title-exit-active {
   opacity: 0;
   transform: translateY(-20px);
   transition: opacity 500ms, transform 500ms;
 }
+
 .katex {
   font-size: 1.1em !important;
   padding: 0 0.2em;
@@ -177,6 +190,7 @@
 .dark .katex .mfrac {
   color: #e5e7eb;
 }
+
 @media (prefers-color-scheme: dark) {
   body {
     color: white;
@@ -185,13 +199,13 @@
     --text-secondary: var(--gray-400);
     --text-tertiary: var(--gray-500);
     --text-quaternary: var(--gray-600);
-    --text-placeholder: hsla(0,0%,100%,.8);
+    --text-placeholder: hsla(0, 0%, 100%, .8);
     --text-error: #f93a37;
-    --border-light: hsla(0,0%,100%,.1);
-    --border-medium: hsla(0,0%,100%,.15);
-    --border-heavy: hsla(0,0%,100%,.2);
-    --border-xheavy: hsla(0,0%,100%,.25);
-    --border-sharp: hsla(0,0%,100%,.05);
+    --border-light: hsla(0, 0%, 100%, .1);
+    --border-medium: hsla(0, 0%, 100%, .15);
+    --border-heavy: hsla(0, 0%, 100%, .2);
+    --border-xheavy: hsla(0, 0%, 100%, .25);
+    --border-sharp: hsla(0, 0%, 100%, .05);
     --main-surface-primary: var(--gray-800);
     --main-surface-secondary: var(--gray-750);
     --main-surface-tertiary: var(--gray-700);
@@ -237,22 +251,26 @@
 
   .sidebar-color {
     color: white;
-    background: #171717; /* Set sidebar-color background color for dark theme */
+    background: #171717;
+    /* Set sidebar-color background color for dark theme */
   }
-  
+
   .hover-light-dark {
     &:hover {
       background-color: var(--gray-800);
     }
   }
+
   .button-theme {
     &:hover {
       background-color: var(--gray-900);
     }
   }
+
   .skeleton {
     background: #2f2f2f;
   }
+
   .sbOrigin {
     transform: translateY(0.15rem) rotate(0deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
@@ -264,16 +282,18 @@
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-200);
   }
+
   .sbRotateDown {
     transform: translateY(-0.15rem) rotate(-15deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-200);
   }
+
   ::selection {
     background-color: white;
     color: black;
   }
-  
+
 }
 
 @media (prefers-color-scheme: light) {
@@ -284,15 +304,15 @@
     --text-secondary: #7d7d7d;
     --text-tertiary: var(--gray-400);
     --text-quaternary: var(--gray-300);
-    --text-placeholder: rgba(0,0,0,.7);
+    --text-placeholder: rgba(0, 0, 0, .7);
     --tag-blue: #08f;
     --tag-blue-light: #0af;
     --text-error: #f93a37;
     --surface-error: 249 58 55;
-    --border-light: rgba(0,0,0,.1);
-    --border-medium: rgba(0,0,0,.15);
-    --border-heavy: rgba(0,0,0,.2);
-    --border-xheavy: rgba(0,0,0,.25);
+    --border-light: rgba(0, 0, 0, .1);
+    --border-medium: rgba(0, 0, 0, .15);
+    --border-heavy: rgba(0, 0, 0, .2);
+    --border-xheavy: rgba(0, 0, 0, .25);
     --border-sharp: rgb(0 0 0/5%);
     --main-surface-primary: var(--white);
     --main-surface-secondary: var(--gray-50);
@@ -340,7 +360,8 @@
 
   .sidebar-color {
     color: black;
-    background: #f9f9f9; /* Set sidebar-color background color for light theme */
+    background: #f9f9f9;
+    /* Set sidebar-color background color for light theme */
   }
 
   .hover-light-dark {
@@ -348,29 +369,35 @@
       background-color: var(--gray-200);
     }
   }
+
   .button-theme {
     &:hover {
       background-color: var(--gray-400);
     }
   }
+
   .skeleton {
     background-color: var(--gray-300);
   }
+
   .sbOrigin {
     transform: translateY(0.15rem) rotate(0deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-200);
   }
+
   .sbRotateUp {
     transform: translateY(0.15rem) rotate(15deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-700);
   }
+
   .sbRotateDown {
     transform: translateY(-0.15rem) rotate(-15deg) translateZ(0px);
     transition: transform 0.3s ease, background-color 0.3s ease;
     background: var(--gray-700);
   }
+
   ::selection {
     background-color: black;
     color: white;
@@ -380,16 +407,18 @@
 /* Hide on screens smaller than 768px (sm breakpoint) */
 @media (max-width: 767px) {
   .notVisible {
-      display: none;
+    display: none;
   }
+
   .isVisible {
     display: block;
   }
+
   .adptView {
     position: fixed;
     inset: 0;
     z-index: 50;
     width: 400px;
   }
-  
+
 }

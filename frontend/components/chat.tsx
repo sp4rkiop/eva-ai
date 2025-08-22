@@ -462,20 +462,41 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
     </div>
   );
 
-  const BranchIndicator = ({ index }: { index: number }) => {
+  const BranchIndicator = ({ index, className }: { index: number; className?: string }) => {
     const branchPoints = getBranchPoints();
     if (!branchPoints.includes(index) || availableBranches.length <= 1) return null;
 
+    const currentIndex = availableBranches.indexOf(currentBranch);
+    const totalBranches = availableBranches.length;
+    const currentDisplay = currentIndex + 1; // 1-based indexing for display
+    const hasPrev = currentIndex > 0;
+    const hasNext = currentIndex < availableBranches.length - 1;
+
     return (
-      <div className="flex items-center justify-center my-2">
-        <div className="flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700 rounded-full">
-          <ChevronLeft className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-          <GitBranch className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-          <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-            Branch point
-          </span>
-          <ChevronRight className="h-3 w-3 text-blue-600 dark:text-blue-400" />
-        </div>
+      <div className={`flex items-center mt-1 ${className || ''}`}>
+        <button
+          onClick={() => hasPrev && switchBranch(availableBranches[currentIndex - 1])}
+          disabled={!hasPrev}
+          className={`p-1 rounded transition-colors ${hasPrev
+            ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
+            : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+            }`}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="text-xs font-medium min-w-[40px] text-center">
+          {currentDisplay} / {totalBranches}
+        </span>
+        <button
+          onClick={() => hasNext && switchBranch(availableBranches[currentIndex + 1])}
+          disabled={!hasNext}
+          className={`p-1 rounded transition-colors ${hasNext
+            ? 'hover:bg-zinc-200 dark:hover:bg-[#2f2f2f]'
+            : 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+            }`}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
     );
   };
@@ -785,54 +806,6 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                 )}
               </div>
 
-              {/* Branch Navigation */}
-              {availableBranches.length > 1 && (
-                <div className="flex items-center justify-center py-2 px-4 border-b bg-gray-50 dark:bg-gray-800">
-                  <div className="flex items-center gap-2">
-                    <GitBranch className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Branch:</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => {
-                          const currentIndex = availableBranches.indexOf(currentBranch);
-                          const prevIndex = currentIndex > 0 ? currentIndex - 1 : availableBranches.length - 1;
-                          switchBranch(availableBranches[prevIndex]);
-                        }}
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <span className="text-sm font-medium bg-white dark:bg-gray-700 px-3 py-1 rounded border">
-                        {currentBranch}
-                      </span>
-                      <button
-                        onClick={() => {
-                          const currentIndex = availableBranches.indexOf(currentBranch);
-                          const nextIndex = currentIndex < availableBranches.length - 1 ? currentIndex + 1 : 0;
-                          switchBranch(availableBranches[nextIndex]);
-                        }}
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
-                    <div className="flex gap-1 ml-2">
-                      {availableBranches.map((branch) => (
-                        <button
-                          key={branch}
-                          onClick={() => switchBranch(branch)}
-                          className={`text-xs px-2 py-1 rounded transition-colors ${branch === currentBranch
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                            }`}
-                        >
-                          {branch}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className='flex h-full overflow-y-auto'>
                 <div
                   ref={chatContainerRef}
@@ -967,39 +940,41 @@ const Chat: React.FC<ChatProps> = ({ chatService, chatId, fName, lName, uMail, u
                                         )}
                                     </div>
                                   </div>
-                                  {/* MessageActions with conditional visibility */}
-                                  {message.role === 'user' ? (
-                                    // Show only on hover for user messages
-                                    hoveredMessageIndex === index ?
+                                  {/* MessageActions and BranchIndicator side by side */}
+                                  <div className={`flex items-center place-content-${message.role === 'user' ? 'end' : 'start'}`} >
+                                    {message.role === 'user' ? (
+                                      // Show only on hover for user messages
+                                      hoveredMessageIndex === index ?
+                                        <MessageActions
+                                          role={message.role}
+                                          content={message.text}
+                                          conversationId={currentChatId}
+                                          index={index}
+                                          onEdit={handleEditMessage}
+                                          className="chat-title-enter-active"
+                                        /> : <MessageActions
+                                          role={message.role}
+                                          content={message.text}
+                                          conversationId={currentChatId}
+                                          index={index}
+                                          onEdit={handleEditMessage}
+                                          className="chat-title-exit-active"
+                                        />
+                                    ) : (
+                                      // Always show for assistant messages
                                       <MessageActions
                                         role={message.role}
                                         content={message.text}
                                         conversationId={currentChatId}
                                         index={index}
-                                        onEdit={handleEditMessage}
-                                        className="chat-title-enter-active"
-                                      /> : <MessageActions
-                                        role={message.role}
-                                        content={message.text}
-                                        conversationId={currentChatId}
-                                        index={index}
-                                        onEdit={handleEditMessage}
-                                        className="chat-title-exit-active"
+                                        className={isAssistantTyping && message.role === 'assistant' && index === messages.length - 1 ? 'hidden' : ''}
                                       />
-                                  ) : (
-                                    // Always show for assistant messages
-                                    <MessageActions
-                                      role={message.role}
-                                      content={message.text}
-                                      conversationId={currentChatId}
-                                      index={index}
-                                      className={isAssistantTyping && message.role === 'assistant' && index === messages.length - 1 ? 'hidden' : ''}
-                                    />
-                                  )}
+                                    )}
+                                    <BranchIndicator index={index} />
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                            <BranchIndicator index={index} />
                           </React.Fragment>
                         ))
                         )}
