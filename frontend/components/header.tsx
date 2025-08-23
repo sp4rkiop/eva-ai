@@ -56,12 +56,65 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
         }
         const data = await response.text();
         if (data != null && data.length != 0) {
-          const models = JSON.parse(data);
-          models.forEach((model: Model) => model.lastSelected = false);
-          setModels(models);
-          window.localStorage.setItem('models', JSON.stringify(models));
-          setSelectedModel(models[0].name);
-          service.selectedModelId$.next(models[0].id);
+          const fetchedModels = JSON.parse(data);
+          fetchedModels.forEach((model: Model) => model.lastSelected = false);
+
+          // Check if localStorage has models and compare with fetched models
+          const savedModelsString = window.localStorage.getItem('models');
+          let shouldUpdateStorage = true;
+
+          if (savedModelsString) {
+            const savedModels = JSON.parse(savedModelsString);
+
+            // Compare if all model id and name are the same
+            const areModelsSame = fetchedModels.length === savedModels.length &&
+              fetchedModels.every((fetchedModel: Model) =>
+                savedModels.some((savedModel: Model) =>
+                  savedModel.id === fetchedModel.id && savedModel.name === fetchedModel.name
+                )
+              );
+
+            if (areModelsSame) {
+              shouldUpdateStorage = false;
+              // Use saved models to preserve lastSelected
+              setModels(savedModels);
+              const lastSelectedModel = savedModels.find((model: Model) => model.lastSelected === true);
+              if (lastSelectedModel) {
+                setSelectedModel(lastSelectedModel.name);
+                service.selectedModelId$.next(lastSelectedModel.id);
+              } else {
+                setSelectedModel(savedModels[0].name);
+                service.selectedModelId$.next(savedModels[0].id);
+              }
+            }
+          }
+
+          if (shouldUpdateStorage) {
+            // Update localStorage but preserve lastSelected if the model exists in new list
+            const savedModelsString = window.localStorage.getItem('models');
+            if (savedModelsString) {
+              const savedModels = JSON.parse(savedModelsString);
+              const lastSelectedModel = savedModels.find((model: Model) => model.lastSelected === true);
+
+              if (lastSelectedModel) {
+                const matchingModel = fetchedModels.find((model: Model) => model.id === lastSelectedModel.id);
+                if (matchingModel) {
+                  matchingModel.lastSelected = true;
+                }
+              }
+            }
+
+            setModels(fetchedModels);
+            window.localStorage.setItem('models', JSON.stringify(fetchedModels));
+            const lastSelectedModel = fetchedModels.find((model: Model) => model.lastSelected === true);
+            if (lastSelectedModel) {
+              setSelectedModel(lastSelectedModel.name);
+              service.selectedModelId$.next(lastSelectedModel.id);
+            } else {
+              setSelectedModel(fetchedModels[0].name);
+              service.selectedModelId$.next(fetchedModels[0].id);
+            }
+          }
         }
       }
       catch (error) {
@@ -75,34 +128,18 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
       }
     };
     // Load models from session storage if available
-    const savedModels = window.localStorage.getItem('models');
-    if (savedModels !== null) {
-      const parsedModels = JSON.parse(savedModels);
-      setModels(parsedModels);
-      if (parsedModels.length > 0) {
-        //check if any model lastSelected is true
-        const lastSelectedModel = parsedModels.find((model: Model) => model.lastSelected === true);
-        if (lastSelectedModel) {
-          setSelectedModel(lastSelectedModel.name);
-          service.selectedModelId$.next(lastSelectedModel.id);
-        } else {
-          setSelectedModel(parsedModels[0].name);
-          service.selectedModelId$.next(parsedModels[0].id);
-        }
-      }
+    if (!fetchedRef.current) {
+      getModels(back_auth);
+      fetchedRef.current = true;
     }
 
     // Load response type from local storage
-    const savedResponseType = window.localStorage.getItem('responseType');
+    const savedResponseType = window.localStorage.getItem('responseType') || "0.5";
     if (savedResponseType !== null) {
       const parsedResponseType = parseFloat(savedResponseType);
       if (!isNaN(parsedResponseType) && parsedResponseType >= 0 && parsedResponseType <= 1) {
         setResponseType(parsedResponseType);
       }
-    }
-    else if (!fetchedRef.current) {
-      getModels(back_auth);
-      fetchedRef.current = true;
     }
   }, []);
 
@@ -148,7 +185,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
       </button>
       <div className="flex cursor-pointer gap-1 rounded-md hover-light-dark dark:hover:bg-neutral-950">
         <DropdownMenu>
-          <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase">
+          <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase focus:outline-none focus:ring-0">
             {selectedModel || 'Default Model'}
             <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
           </DropdownMenuTrigger>

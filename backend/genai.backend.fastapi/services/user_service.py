@@ -248,10 +248,8 @@ class UserService:
         try:
             async with PostgreSQLDatabase.get_session() as session:
                 # Query chat history
-                stmt = (
-                    select(ChatHistory)
-                    .where(ChatHistory.user_id == user_id)
-                    .where(ChatHistory.visible == True)
+                stmt = select(ChatHistory).where(
+                    ChatHistory.user_id == user_id, ChatHistory.visible
                 )
                 result = await session.execute(stmt)
                 conversations = result.scalars().all()
@@ -297,7 +295,7 @@ class UserService:
                     .where(
                         ChatHistory.user_id == user_id,
                         ChatHistory.chat_id == chat_id,
-                        ChatHistory.visible.is_(True),
+                        ChatHistory.visible,
                     )
                 )
                 rows = (await session.execute(stmt)).all()
@@ -339,6 +337,8 @@ class UserService:
     async def get_subscribed_models(self, user_id: uuid.UUID) -> List[Dict[str, Any]]:
         """
         Get all models the user is subscribed to.
+        Uses Redis cache with 4-hour expiry for better performance.
+        Cache is invalidated when models are added/updated/deleted.
 
         Args:
             user_id: User's UUID
@@ -347,24 +347,43 @@ class UserService:
             List of subscribed models or empty list
         """
         try:
+            # Create cache key for user's subscribed models
+            cache_key = f"user_subscribed_models:{user_id}"
+            import pickle
+            import base64
+
+            # Try to get from Redis cache first
+            cached_data = await self.redis.get(cache_key)
+            if cached_data is not None:
+                return pickle.loads(base64.b64decode(cached_data))
+
+            # Cache miss - query database
             async with PostgreSQLDatabase.get_session() as session:
                 # Query subscriptions with joined model details
                 stmt = (
                     select(Subscriptions)
+                    .join(Subscriptions.ai_models)
                     .options(selectinload(Subscriptions.ai_models))
-                    .where(Subscriptions.user_id == user_id)
+                    .where(Subscriptions.user_id == user_id, AiModels.is_active)
                 )
                 result = await session.execute(stmt)
                 subscriptions = result.scalars().all()
 
                 # Extract model details from relationships
-                return [
+                models_data = [
                     {
                         "id": sub.ai_models.model_id,
                         "name": sub.ai_models.deployment_name,
                     }
                     for sub in subscriptions
                 ]
+
+                # Cache the result for 4 hours (14400 seconds)
+                pickled_data = pickle.dumps(models_data)
+                encoded_data = base64.b64encode(pickled_data).decode("utf-8")
+                await self.redis.set(cache_key, encoded_data, ex=14400)
+
+                return models_data
         except Exception as ex:
             # Log the exception
             logger.exception(
@@ -416,7 +435,7 @@ class UserService:
                 f"Failed to check if model is subscribed for user {user_id} and model {model_id} with error: {str(e)}",
                 exc_info=True,
             )
-            raise Exception(f"Failed to check if model is subscribed.")
+            raise Exception("Failed to check if model is subscribed.")
 
     async def rename_conversation(
         self, user_id: uuid.UUID, chat_id: uuid.UUID, new_title: str

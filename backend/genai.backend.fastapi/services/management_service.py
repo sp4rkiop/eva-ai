@@ -1,11 +1,15 @@
-import logging, uuid, pickle
+import logging
+import uuid
+import pickle
+import base64
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select, cast, Date
 from core.database import PostgreSQLDatabase
-from repositories.cache_repository import CacheRepository
+from core.redis_cache import RedisCache
 from models.request_model import AiModel
+from services.user_service import UserService
 from services.user_service import UserService
 from utils.cursor_utils import encode_cursor, decode_cursor
 from models.ai_models_model import AiModels
@@ -22,7 +26,34 @@ MAX_LIMIT = 100  # hard safety cap
 
 class ManagementService:
     @staticmethod
-    async def get_all_models() -> List[AiModels]:
+    async def _invalidate_user_model_caches():
+        """
+        Invalidate all user-specific subscribed model caches.
+        This ensures that get_subscribed_models returns fresh data after model changes.
+        """
+        try:
+            redis_conn = RedisCache.get_connection()
+            # Find all user subscribed model cache keys
+            pattern = "user_subscribed_models:*"
+            keys_to_delete = []
+
+            # Use scan to find all matching keys
+            async for key in redis_conn.scan_iter(pattern):
+                keys_to_delete.append(key)
+
+            # Delete all found keys
+            if keys_to_delete:
+                await redis_conn.delete(*keys_to_delete)
+                logger.info(
+                    f"Invalidated {len(keys_to_delete)} user model cache entries"
+                )
+        except Exception as ex:
+            logger.error(
+                f"Failed to invalidate user model caches: {str(ex)}", exc_info=True
+            )
+
+    @staticmethod
+    async def get_all_models(update: bool = False) -> List[AiModels]:
         """
         Get all models.
 
@@ -30,9 +61,14 @@ class ManagementService:
             List of models or empty list
         """
         try:
-            model_list = CacheRepository.get("all_models")
-            if model_list is not None:
-                return model_list
+            redis_conn = RedisCache.get_connection()
+            cache_key = "all_models"
+            if not update:
+                # Try to get from Redis cache
+                cached_data = await redis_conn.get(cache_key)
+                if cached_data is not None:
+                    return pickle.loads(base64.b64decode(cached_data))
+
             async with PostgreSQLDatabase.get_session() as session:
                 # Query AI models
                 stmt = select(AiModels)
@@ -40,11 +76,13 @@ class ManagementService:
                 ai_models = result.scalars().all()
 
                 model_list = list(ai_models)
-                # save into cache
-                CacheRepository.set(
-                    "all_models", model_list, 86400
+                # Serialize using pickle and encode as base64, then save into Redis cache
+                pickled_data = pickle.dumps(model_list)
+                encoded_data = base64.b64encode(pickled_data).decode("utf-8")
+                await redis_conn.set(
+                    cache_key, encoded_data, ex=86400
                 )  # 86400 seconds = 1 day
-                return list(model_list)
+                return model_list
         except Exception as ex:
             # Log the exception
             logger.error(f"Failed to get models: {str(ex)}", exc_info=True)
@@ -334,9 +372,7 @@ class ManagementService:
             usage_data = await self.get_usage_data(last_days=90)
 
             # Active models
-            stmt = select(func.count(AiModels.model_id)).where(
-                AiModels.is_active == True
-            )
+            stmt = select(func.count(AiModels.model_id)).where(AiModels.is_active)
             active_models = (await session.execute(stmt)).scalar()
 
             # Recent 3 user by their last chat time
@@ -407,6 +443,15 @@ class ManagementService:
                 session.add(new_sub)
             await session.commit()
 
+            # Invalidate the specific user's model cache if subscription was added
+            if query_params.get("model_id") is not None:
+                redis_conn = RedisCache.get_connection()
+                cache_key = f"user_subscribed_models:{user_id}"
+                await redis_conn.delete(cache_key)
+                logger.info(
+                    f"Invalidated model cache for user {user_id} after subscription change"
+                )
+
     async def delete_user(self, user_id: uuid.UUID):
         async with PostgreSQLDatabase.get_session() as session:
             user = await session.get(Users, user_id)
@@ -452,7 +497,9 @@ class ManagementService:
             if query_params.get("model_version"):
                 model.model_version = query_params["model_version"]
             await session.commit()
-            await self.get_all_models()
+            await self.get_all_models(update=True)
+            # Invalidate user-specific model caches since model status changed
+            await self._invalidate_user_model_caches()
 
     async def add_model(self, model_data: AiModel) -> uuid.UUID:
         async with PostgreSQLDatabase.get_session() as session:
@@ -468,7 +515,9 @@ class ManagementService:
             )
             session.add(new_model)
             await session.commit()
-            await self.get_all_models()
+            await self.get_all_models(update=True)
+            # Invalidate user-specific model caches since new model was added
+            await self._invalidate_user_model_caches()
             return new_model.model_id
 
     async def delete_model(self, model_id: uuid.UUID):
@@ -480,4 +529,6 @@ class ManagementService:
                 )
             await session.delete(model)
             await session.commit()
-            await self.get_all_models()
+            await self.get_all_models(update=True)
+            # Invalidate user-specific model caches since model was deleted
+            await self._invalidate_user_model_caches()
