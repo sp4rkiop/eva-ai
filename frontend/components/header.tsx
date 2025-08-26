@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useVisibility } from './VisibilityContext';
 import { ChatService } from '@/lib/service';
-import { Menu, MenuButton, MenuItem, MenuItems, Transition } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 import {
   DropdownMenu,
@@ -169,10 +168,10 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
   };
 
   const getResponseTypeLabel = (value: number): string => {
-    if (value === 0) return 'Precise';
-    if (value === 0.5) return 'Neutral';
+    if (value === 0) return 'Concise';
+    if (value === 0.5) return 'Normal';
     if (value === 1) return 'Creative';
-    return 'Neutral';
+    return 'Normal';
   };
 
   return (
@@ -187,7 +186,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
         <DropdownMenu>
           <DropdownMenuTrigger className="inline-flex w-full justify-center gap-x-1.5  px-3 py-2 text-sm font-semibold uppercase focus:outline-none focus:ring-0">
             {selectedModel || 'Default Model'}
-            <ChevronDownIcon className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
+            <ChevronDownIcon className="-mr-1 h-5 w-5 text-zinc-400" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <DropdownMenuLabel>Models</DropdownMenuLabel>
@@ -213,7 +212,7 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
       </div>
       <div className="flex items-center gap-1 mr-2 md:mr-4">
         <div className="flex flex-row items-center gap-2">
-          <span className="hidden md:block text-xs text-gray-600 dark:text-zinc-200 uppercase">
+          <span className="hidden md:block text-xs text-zinc-600 dark:text-zinc-200 uppercase">
             Response Type
           </span>
           <div className="flex items-center gap-2">
@@ -223,9 +222,9 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
               max={1}
               min={0}
               step={0.5}
-              className="w-20 sm:w-24"
+              className="w-20 sm:w-24 m-1"
             />
-            <span className="text-sm font-medium min-w-[50px] text-center">
+            <span className="text-sm font-medium w-[70px] text-center">
               {getResponseTypeLabel(responseType)}
             </span>
           </div>

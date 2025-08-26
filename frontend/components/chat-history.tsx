@@ -406,11 +406,11 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                   }}
                 >
                   <div className="h-7 w-7">
-                    <div className="relative flex h-full items-center justify-center rounded-full text-gray-950">
+                    <div className="relative flex h-full items-center justify-center rounded-full text-zinc-950">
                       <IconEva className="mx-auto size-10" />
                     </div>
                   </div>
-                  <span className="group-hover:text-gray-950 dark:group-hover:text-gray-200">New Chat</span>
+                  <span className="group-hover:text-zinc-950 dark:group-hover:text-zinc-200">New Chat</span>
                 </button>
                 <button
                   className="flex h-10 w-10 items-center justify-center rounded-md hover-light-dark"
@@ -439,7 +439,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
             <div className="grow flex-col gap-2 pt-4 pb-4 text-sm overflow-y-auto">
               {sortedGroups.map((group) => (
                 <div key={group.name} className="mb-2">
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-2 py-2">
+                  <div className="text-xs font-medium text-zinc-500 dark:text-zinc-400 px-2 py-2">
                     {group.name}
                   </div>
                   <TransitionGroup component={null}>
@@ -478,7 +478,7 @@ const ChatHistory: React.FC<ChatHistoryProps> = ({ uMail, firstName, lastName, u
                             {/* Dropdown menu for each chat title */}
                             <div className={`absolute right-0 top-0 bottom-0 flex items-center opacity-0 group-hover:opacity-100`}>
                               <DropdownMenu modal={false}>
-                                <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-gray-800 dark:text-white rounded-r-lg focus:outline-none">
+                                <DropdownMenuTrigger className="backdrop-blur-sm inline-flex justify-center w-full p-2 text-sm font-medium text-zinc-800 dark:text-white rounded-r-lg focus:outline-none">
                                   <Ellipsis className='size-4' />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>

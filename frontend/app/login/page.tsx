@@ -12,7 +12,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-400 via-white to-zinc-400 dark:from-zinc-900 dark:via-zinc-800 dark:to-zinc-900 flex items-center justify-center p-4">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -76,7 +76,7 @@ export default function Login() {
             <h2 className="text-3xl font-bold mb-2 md:hidden">Eva</h2>
             {/* Desktop-only heading */}
             <h2 className="text-3xl font-bold mb-2 hidden md:block">Welcome Back</h2>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p className="text-zinc-600 dark:text-zinc-300">
               Sign in to continue your AI conversation journey
             </p>
           </div>
@@ -86,7 +86,7 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => signIn("google")}
-              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
+              className="w-full flex items-center justify-center space-x-3 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 text-zinc-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
             >
               <IconGoogle className="w-6 h-6" />
               <span>Continue with Google</span>
@@ -96,18 +96,18 @@ export default function Login() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => signIn("github")}
-              className="w-full flex items-center justify-center space-x-3 bg-gray-100 dark:bg-zinc-700 hover:bg-gray-200 dark:hover:bg-zinc-600 text-gray-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
+              className="w-full flex items-center justify-center space-x-3 bg-zinc-100 dark:bg-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-600 text-zinc-800 dark:text-white px-6 py-4 rounded-md transition-all duration-200"
             >
               <IconGitHub className="w-6 h-6" />
               <span>Continue with GitHub</span>
             </motion.button>
           </div>
 
-          <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="mt-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
             By continuing, you agree to our
             <a href="https://github.com/SP4RKiOP/eva-ai#license" className="text-purple-600 dark:text-purple-400 hover:underline ml-1">
               License
-            </a> 
+            </a>
             {/* and 
             <a href="#" className="text-purple-600 dark:text-purple-400 hover:underline ml-1">
               Privacy Policy
