@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Slider } from "@/components/ui/slider"
 import { useToast } from './ui/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 interface Model {
   id: number;
   name: string;
@@ -168,10 +169,10 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
   };
 
   const getResponseTypeLabel = (value: number): string => {
-    if (value === 0) return 'Concise';
-    if (value === 0.5) return 'Normal';
+    if (value === 0) return 'Focused';
+    if (value === 0.5) return 'Balanced';
     if (value === 1) return 'Creative';
-    return 'Normal';
+    return 'Balanced';
   };
 
   return (
@@ -210,26 +211,30 @@ const Header: React.FC<HeaderProps> = ({ service, onNewChatClick, getuId_token, 
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <div className="flex items-center gap-1 mr-2 md:mr-4">
-        <div className="flex flex-row items-center gap-2">
-          <span className="hidden md:block text-xs text-zinc-600 dark:text-zinc-200 uppercase">
-            Response Type
-          </span>
-          <div className="flex items-center gap-2">
-            <Slider
-              value={[responseType]}
-              onValueChange={handleResponseTypeChange}
-              max={1}
-              min={0}
-              step={0.5}
-              className="w-20 sm:w-24 m-1"
-            />
-            <span className="text-sm font-medium w-[70px] text-center">
-              {getResponseTypeLabel(responseType)}
-            </span>
-          </div>
-        </div>
-      </div>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1 mr-2 md:mr-4">
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={[responseType]}
+                  onValueChange={handleResponseTypeChange}
+                  max={1}
+                  min={0}
+                  step={0.5}
+                  className="w-20 sm:w-24 m-1"
+                />
+                <span className="text-sm font-medium w-[70px] text-center">
+                  {getResponseTypeLabel(responseType)}
+                </span>
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="text-sm">Controls response creativity: Focused (precise), Balanced (normal), Creative (varied)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <div className="md:hidden absolute bottom-0 right-0 top-0 flex">
         <button type="button" className="px-3" onClick={(e) => { e.preventDefault(); onNewChatClick(); }}>
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
