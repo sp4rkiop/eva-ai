@@ -5,7 +5,7 @@ FROM python:3.12.11-slim
 WORKDIR /app
 
 # Install uv
-RUN pip install --no-cache-dir uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install system dependencies required by LangChain document loaders
 # RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,7 +23,8 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies into the system Python
-RUN uv sync --frozen --no-dev --system
+ENV UV_SYSTEM_PYTHON=1
+RUN uv sync --frozen --no-dev
 
 # Now copy the rest of the application code
 COPY . .
