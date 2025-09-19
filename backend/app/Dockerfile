@@ -5,7 +5,7 @@ FROM python:3.12.11-slim
 WORKDIR /app
 
 # Install uv
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN pip install --no-cache-dir uv
 
 # Install system dependencies required by LangChain document loaders
 # RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,8 +22,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # Copy only dependency manifests first (for Docker layer caching)
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies into the system Python
-ENV UV_SYSTEM_PYTHON=1
+# Install dependencies
 RUN uv sync --frozen --no-dev
 
 # Now copy the rest of the application code
@@ -35,5 +34,5 @@ RUN chmod +x /app/start.sh
 # Expose the ports
 EXPOSE 8000
 
-# Command to run the startup script
-CMD ["/app/start.sh"]
+# Starting FastAPI directly from the virtual environment
+CMD ["/app/.venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
