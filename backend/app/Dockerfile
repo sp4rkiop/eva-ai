@@ -4,10 +4,11 @@ FROM python:3.12.11-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
 # Install system dependencies required by LangChain document loaders
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+ && rm -rf /var/lib/apt/lists/*
+
 # RUN apt-get update && apt-get install -y --no-install-recommends \
 #     build-essential \
 #     gcc \
@@ -18,6 +19,9 @@ RUN pip install --no-cache-dir uv
 #     tesseract-ocr \
 #     qpdf \
 #  && rm -rf /var/lib/apt/lists/*
+
+# Install uv official binary
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Copy only dependency manifests first (for Docker layer caching)
 COPY pyproject.toml uv.lock ./
