@@ -4,6 +4,9 @@ FROM python:3.12.11-slim
 # Set the working directory in the container
 WORKDIR /app
 
+# Install uv
+RUN pip install --no-cache-dir uv
+
 # Install system dependencies required by LangChain document loaders
 # RUN apt-get update && apt-get install -y --no-install-recommends \
 #     build-essential \
@@ -16,14 +19,14 @@ WORKDIR /app
 #     qpdf \
 #  && rm -rf /var/lib/apt/lists/*
 
-# Copy only requirements.txt first to leverage Docker layer caching
-COPY requirements.txt /app/
+# Copy only dependency manifests first (for Docker layer caching)
+COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies into the system Python
+RUN uv sync --frozen --no-dev --system
 
-# Copy the rest of the application code
-COPY . /app
+# Now copy the rest of the application code
+COPY . .
 
 # Make the startup script executable
 RUN chmod +x /app/start.sh
