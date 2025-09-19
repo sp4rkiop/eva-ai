@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Add uv binaries to PATH for all future layers & runtime
-ENV PATH="$HOME/.local/bin:${PATH}"
+ENV PATH="/root/.local/bin:${PATH}"
 
 # Copy only dependency manifests first (for Docker layer caching)
 COPY pyproject.toml uv.lock ./
