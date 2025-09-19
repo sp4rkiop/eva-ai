@@ -28,9 +28,6 @@ RUN uv sync --frozen --no-dev
 # Now copy the rest of the application code
 COPY . .
 
-# Make the startup script executable
-RUN chmod +x /app/start.sh
-
 # Expose the ports
 EXPOSE 8000
 
